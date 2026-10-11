@@ -280,6 +280,39 @@ button,input,textarea{font:inherit}button{border:0;cursor:pointer}button:disable
 .watch.gameOn{grid-template-rows:auto minmax(0,.55fr) minmax(0,1.45fr) auto}
 .watch.gameOn.gameBig{grid-template-rows:auto minmax(0,1fr) auto}
 .watch.gameBig>.pane:nth-child(2){display:none}
+/* Star shop ported from Maddy's (Midweek) Meeting Buddy: same items, art and look */
+.mmbShop{--lilac:#8b63b3;--shadow:0 10px 28px rgba(80,55,110,.10);--kid-display:"Fredoka","Nunito",system-ui,sans-serif}
+.mmbShop .shopTop{display:flex;justify-content:flex-end}
+.mmbShop h1{font-family:var(--kid-display);font-size:32px;margin:8px 0 4px}
+.mmbShop .subtitle{color:var(--muted);font-size:16px;line-height:1.4;margin:0}
+.star-chip{display:flex;align-items:center;gap:6px;background:#fff8e6;border:2px solid #f2c14e;color:#8a5a00;border-radius:999px;padding:8px 12px;font-weight:800;white-space:nowrap}
+.star-chip span{color:#f2c14e;font-size:18px}
+.mmbShop .solid{border:0;border-radius:14px;padding:11px 12px;font-weight:800;font-size:14px;white-space:nowrap;background:var(--lilac);color:#fff;min-height:44px}
+.shop-section{margin:18px 0 8px;font-family:var(--kid-display);font-size:22px}
+.shop-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+@media(min-width:720px){.shop-grid{grid-template-columns:repeat(3,minmax(0,1fr));}}
+.shop-item{background:#fff;border:2px solid var(--line);border-radius:18px;padding:12px;text-align:left;color:#1a2236}
+.shop-item.on{border-color:#f2c14e;background:#fff8e6}
+.shop-item.owned{border-color:#c9b4e4}
+.shop-item .ico{font-size:34px;line-height:1}
+.shop-item .ico img{height:52px;width:auto;display:block;margin:0 auto}
+.shop-item h3{margin:6px 0 2px;font-family:var(--kid-display);font-size:18px}
+.shop-item p{margin:0 0 10px;color:var(--muted);font-size:14px}
+.shop-buddy{position:relative;width:140px;height:140px;margin:10px 0 6px;border-radius:24px;overflow:hidden;background:#fff;box-shadow:var(--shadow)}
+.shop-chest{margin:12px 0 18px;background:#fff;border:2px dashed #d7c7ee;border-radius:18px;padding:12px}
+.shop-chest input{width:100%;border:2px solid var(--line);border-radius:12px;padding:10px;margin:6px 0;font:inherit}
+.buddy-face{position:relative;overflow:hidden}
+.shop-buddy img.buddy-art,.buddy-face img.buddy-art,.shop-buddy img.acc-overlay,.buddy-face img.acc-overlay{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%}
+.acc-overlay{pointer-events:none}
+.acc-frame{position:absolute;inset:0;border:6px solid #f2c14e;border-radius:inherit;box-shadow:inset 0 0 0 2px #fff;pointer-events:none}
+.acc-crown{position:absolute;top:-2px;left:50%;transform:translateX(-50%);font-size:28px;pointer-events:none;filter:drop-shadow(0 2px 0 #fff)}
+.acc-glow{position:absolute;inset:-6px;border-radius:inherit;box-shadow:0 0 18px 6px rgba(255,220,80,.65),0 0 0 3px rgba(255,240,160,.4);pointer-events:none}
+.acc-cape{position:absolute;left:8%;right:8%;bottom:6%;height:42%;background:linear-gradient(#c45b5b,#8a2c2c);border-radius:0 0 40px 40px;z-index:0;pointer-events:none;opacity:.9}
+.acc-sparkles{position:absolute;inset:0;pointer-events:none;font-size:18px}
+.acc-sparkles::before{content:"✨";position:absolute;top:6px;left:6px}
+.acc-sparkles::after{content:"✨";position:absolute;bottom:10px;right:8px}
+.brutusDock.buddy-face .acc-crown{font-size:14px}.brutusDock.buddy-face .acc-frame{border-width:3px}.brutusDock.buddy-face .acc-sparkles{font-size:9px}
+.finishBuddy{width:96px;height:96px;border-radius:50%;margin:0 auto;background:#fff}
 </style>
 </head>
 <body>
@@ -421,28 +454,57 @@ const units=[
 ];
 
 const STORE='smb-sunday-2026-10-11-v1';
+// Star shop items + Brutus art from Maddy's (Midweek) Meeting Buddy. Sunday keeps its own stars (state.stars in this app's STORE key).
+const BUDDY_ART='media/img-004.jpg';
+const ACC_LAYERS={bow:"media/img-042.webp",party:"media/img-043.webp",glasses:"media/img-044.webp",starsticker:"media/img-045.webp",heart:"media/img-046.webp",daisy:"media/img-047.webp",bamboo:"media/img-048.webp"};
 const SHOP=[
-  {id:'bow',slot:'hat',name:'Bow',cost:2,html:'<div class="layer" style="top:6px;left:58px;font-size:28px">🎀</div>'},
-  {id:'party',slot:'hat',name:'Party hat',cost:3,html:'<div class="layer" style="top:0;left:54px;font-size:30px">🎉</div>'},
-  {id:'crown',slot:'hat',name:'Flower crown',cost:4,html:'<div class="layer" style="top:8px;left:48px;font-size:28px">🌼</div>'},
-  {id:'cap',slot:'hat',name:'Cap',cost:3,html:'<div class="layer" style="top:4px;left:50px;font-size:28px">🧢</div>'},
-  {id:'glasses',slot:'eyes',name:'Glasses',cost:2,html:'<div class="layer" style="top:58px;left:48px;font-size:26px">👓</div>'},
-  {id:'sunnies',slot:'eyes',name:'Sunnies',cost:3,html:'<div class="layer" style="top:58px;left:48px;font-size:26px">🕶️</div>'},
-  {id:'bandana',slot:'neck',name:'Blue bandana',cost:2,html:'<div class="layer" style="top:92px;left:52px;font-size:24px">💙</div>'},
-  {id:'tie',slot:'neck',name:'Bowtie',cost:3,html:'<div class="layer" style="top:96px;left:58px;font-size:22px">🎀</div>'},
-  {id:'medal',slot:'neck',name:'Medal',cost:4,html:'<div class="layer" style="top:100px;left:58px;font-size:22px">🏅</div>'},
-  {id:'bible',slot:'paw',name:'Bible',cost:3,html:'<div class="layer" style="top:130px;left:18px;font-size:26px">📖</div>'},
-  {id:'star',slot:'paw',name:'Star',cost:2,html:'<div class="layer" style="top:132px;left:20px;font-size:26px">⭐</div>'},
-  {id:'bone',slot:'paw',name:'Bone',cost:2,html:'<div class="layer" style="top:132px;left:18px;font-size:26px">🦴</div>'}
+  {id:"bow", slot:"hat", name:"Ribbon bow", ico:"🎀", src:'media/img-084.png', cost:5, blurb:"A bow for meeting nights."},
+  {id:"daisy", slot:"hat", name:"Daisy crown", ico:"🌼", src:'media/img-085.png', cost:8, blurb:"Tiny flowers on top."},
+  {id:"party", slot:"hat", name:"Party hat", ico:"🥳", src:'media/img-086.png', cost:10, blurb:"For a star-heavy night."},
+  {id:"glasses", slot:"badge", name:"Smart glasses", ico:"🤓", src:'media/img-087.png', cost:6, blurb:"Ready to listen."},
+  {id:"starsticker", slot:"badge", name:"Star sticker", ico:"⭐", src:'media/img-088.png', cost:4, blurb:"Show off a star."},
+  {id:"heart", slot:"held", name:"Heart balloon", ico:"🎈", src:'media/img-089.png', cost:7, blurb:"A quiet little balloon."},
+  {id:"bamboo", slot:"held", name:"Snack", ico:"🍡", src:'media/img-090.png', cost:5, blurb:"A treat after the meeting."},
+  {id:"frame", slot:"frame", name:"Gold frame", ico:"🖼️", src:'media/img-091.png', cost:12, blurb:"Fancy picture frame."},
+  {id:"crown", slot:"hat", name:"Tiny crown", ico:"👑", cost:12, blurb:"A little queen look."},
+  {id:"cape", slot:"held", name:"Red cape", ico:"🦸", cost:10, blurb:"Flies behind you."},
+  {id:"glow", slot:"frame", name:"Sunshine glow", ico:"🌟", cost:15, blurb:"A hidden warm glow.", secret:true, code:"shine"},
+  {id:"sparkles", slot:"badge", name:"Sparkles", ico:"✨", cost:12, blurb:"A hidden twinkle.", secret:true, code:"sparkle"}
 ];
-const DEFAULT={screen:'setup',talk:'',opening:'',unit:0,view:'actual',stars:0,earned:{},activityStars:{},materialAwarded:{},attempts:{},test:false,meetingStarted:null,wtUnlocked:false,talkDone:false,talkNotes:{},questionAnswers:{},game:{},marks:{},hl:'y',chat:[],owned:[],wear:{},theme:'lavender',font:'system',bg:'plain',readAt:{}};
+// Old Sunday shop ids (before this port) → the matching Midweek item; anything without a match is refunded.
+const OLD_SHOP={bow:['bow',2],party:['party',3],crown:['daisy',4],cap:[null,3],glasses:['glasses',2],sunnies:['glasses',3],bandana:[null,2],tie:[null,3],medal:[null,4],bible:[null,3],star:['starsticker',2],bone:['bamboo',2]};
+const DEFAULT={shopV:2,screen:'setup',talk:'',opening:'',unit:0,view:'actual',stars:0,earned:{},activityStars:{},materialAwarded:{},attempts:{},test:false,meetingStarted:null,wtUnlocked:false,talkDone:false,talkNotes:{},questionAnswers:{},game:{},marks:{},hl:'y',chat:[],owned:[],wear:{items:[]},theme:'lavender',font:'system',bg:'plain',readAt:{}};
 let state={...DEFAULT};
 let drawState={color:'#182033',size:6,drawing:null,history:[],redo:[],erase:false,brush:'ink',strokes:[]};
 let canvas,ctx,drawing=false,lastX=0,lastY=0;
 
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function save(){try{localStorage.setItem(STORE,JSON.stringify(state))}catch(e){}}
-function load(){try{const s=JSON.parse(localStorage.getItem(STORE)||'null');if(s)state={...DEFAULT,...s}}catch(e){}}
+function load(){try{const s=JSON.parse(localStorage.getItem(STORE)||'null');if(s)state={...DEFAULT,...s,shopV:s.shopV||1};else carryOver()}catch(e){}migrateShop()}
+// A new week gets a new STORE key; keep Maddy's stars and shop things from the latest earlier Sunday week (never Midweek's mmb2_* keys).
+function carryOver(){
+  try{
+    const keys=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('smb-sunday-')&&k!==STORE&&k<STORE)keys.push(k)}
+    keys.sort(); const prev=keys.length?JSON.parse(localStorage.getItem(keys[keys.length-1])||'null'):null; if(!prev) return;
+    const keep={stars:Number(prev.stars)||0,owned:Array.isArray(prev.owned)?prev.owned:[],wear:prev.wear||{},shopV:prev.shopV||1,theme:prev.theme,font:prev.font,bg:prev.bg};
+    Object.keys(keep).forEach(k=>keep[k]===undefined&&delete keep[k]); state={...DEFAULT,...keep};
+  }catch(e){}
+}
+function migrateShop(){
+  try{
+    if(state.shopV!==2){
+      const owned=[],wear=[]; let refund=0;
+      (Array.isArray(state.owned)?state.owned:[]).forEach(id=>{const m=OLD_SHOP[id]; if(m&&m[0]){if(!owned.includes(m[0]))owned.push(m[0])} else if(m) refund+=m[1]});
+      const w=state.wear&&typeof state.wear==='object'&&!Array.isArray(state.wear)?state.wear:{};
+      Object.values(w).forEach(id=>{const m=OLD_SHOP[id]; if(m&&m[0]&&!wear.includes(m[0]))wear.push(m[0])});
+      state.owned=owned; state.wear={items:wear}; state.stars=(Number(state.stars)||0)+refund; state.shopV=2;
+    }
+    if(!Array.isArray(state.owned)) state.owned=[];
+    state.owned=state.owned.filter(id=>SHOP.some(s=>s.id===id));
+    if(!state.wear||!Array.isArray(state.wear.items)) state.wear={items:[]};
+    state.wear.items=state.wear.items.filter(id=>state.owned.includes(id));
+  }catch(e){state.owned=[];state.wear={items:[]};state.shopV=2}
+}
 function unit(){return units[state.unit]}
 function unitLabel(u){return u.review?'Review':(u.ps.length>1?`¶ ${u.ps[0]}–${u.ps[u.ps.length-1]}`:`¶ ${u.ps[0]}`)}
 function applyLook(){
@@ -481,7 +543,7 @@ function holdExplain(msg){
 
 function header(){
   return `<div class="top">
-    <button class="brutusDock" id="openChat" title="Talk to Brutus"><img src="brutus.png" alt="Brutus"></button>
+    <button class="brutusDock buddy-face buddyMount" id="openChat" title="Talk to Brutus">${buddyFaceHTML()}</button>
     <div class="brand">Sunday Buddy</div>
     <div class="grow"></div>
     <button class="toolBtn" id="openShop">⭐ Shop</button>
@@ -874,7 +936,7 @@ function bind(){
   document.getElementById('openLook')?.addEventListener('click',openLook);
   document.getElementById('start')?.addEventListener('click',()=>{
     const jump=+document.getElementById('setupJump')?.value||0;
-    state={...DEFAULT,talk:document.getElementById('talk').value.trim()||'Public Talk',opening:document.getElementById('opening').value.trim(),test:!!document.getElementById('testMode')?.checked,screen:'talk',meetingStarted:Date.now(),chat:state.chat,owned:state.owned,wear:state.wear,theme:state.theme,font:state.font,bg:state.bg,stars:state.stars};
+    state={...DEFAULT,talk:document.getElementById('talk').value.trim()||'Public Talk',opening:document.getElementById('opening').value.trim(),test:!!document.getElementById('testMode')?.checked,screen:'talk',meetingStarted:Date.now(),chat:state.chat,owned:state.owned,wear:state.wear,shopV:state.shopV,theme:state.theme,font:state.font,bg:state.bg,stars:state.stars};
     state._setupJump=jump;
     save();render();
   });
@@ -932,7 +994,7 @@ function bind(){
       window._gateT=setTimeout(tick,2000);
     }
   }
-  document.getElementById('restart')?.addEventListener('click',()=>{const keep={owned:state.owned,wear:state.wear,theme:state.theme,font:state.font,bg:state.bg,stars:state.stars,chat:[]};state={...DEFAULT,...keep,screen:'setup'};save();render()});
+  document.getElementById('restart')?.addEventListener('click',()=>{const keep={owned:state.owned,wear:state.wear,shopV:state.shopV,theme:state.theme,font:state.font,bg:state.bg,stars:state.stars,chat:[]};state={...DEFAULT,...keep,screen:'setup'};save();render()});
   document.getElementById('end84')?.addEventListener('click',()=>openSong(150));
   document.getElementById('openShop2')?.addEventListener('click',openShop);
 }
@@ -1190,7 +1252,7 @@ function startFly(key){
 
 function finish(){
   return `<section class="finish">
-    <img src="brutus.png" alt="" style="width:96px;height:96px;border-radius:50%;object-fit:cover;object-position:50% 18%">
+    <div class="buddy-face finishBuddy buddyMount" id="finishBuddy">${buddyFaceHTML()}</div>
     <div class="eyebrow">Done</div>
     <h1>Great job, Maddy</h1>
     <div class="finishStats"><div class="stat">⭐ ${state.stars}</div><div class="stat">${units.length*3} possible</div><div class="stat">${Object.values(state.questionAnswers).filter(Boolean).length} answers</div></div>
@@ -1199,35 +1261,77 @@ function finish(){
     <button class="primary" id="restart">New meeting</button>
   </section>`;
 }
-function buddyHTML(){
-  const layers=Object.entries(state.wear||{}).map(([slot,id])=>{const it=SHOP.find(s=>s.id===id);return it?it.html:''}).join('');
-  return `<div class="buddyStage"><img class="base" src="brutus.png" alt="Brutus">${layers}</div>`;
+function wearing(){return (state.wear&&Array.isArray(state.wear.items))?state.wear.items:[]}
+function isWearing(id){return wearing().includes(id)}
+function accessoryHTML(){
+  const order=["cape","bamboo","heart","starsticker","glasses","bow","daisy","party","glow","sparkles","crown","frame"];
+  return order.filter(isWearing).map(id=>{
+    if(id==="frame") return '<div class="acc-frame" aria-hidden="true"></div>';
+    if(id==="crown") return '<div class="acc-crown" aria-hidden="true">👑</div>';
+    if(id==="glow") return '<div class="acc-glow" aria-hidden="true"></div>';
+    if(id==="cape") return '<div class="acc-cape" aria-hidden="true"></div>';
+    if(id==="sparkles") return '<div class="acc-sparkles" aria-hidden="true"></div>';
+    return ACC_LAYERS[id]?'<img class="acc-overlay" alt="" src="'+ACC_LAYERS[id]+'">':'';
+  }).join('');
+}
+function buddyFaceHTML(){return '<img class="buddy-art" alt="Brutus" src="'+BUDDY_ART+'">'+accessoryHTML()}
+// Repaint Brutus everywhere he is on screen without re-rendering the page (a running game is not reloaded).
+function paintBuddy(){document.querySelectorAll('.buddyMount,#shopBuddyPreview').forEach(el=>el.innerHTML=buddyFaceHTML())}
+function shopCardHTML(item,secret){
+  const owned=(state.owned||[]).includes(item.id), on=isWearing(item.id);
+  const label=owned?(on?'Wearing':'Put on'):'Buy · '+item.cost+' ★';
+  return `<article class="shop-item${owned?' owned':''}${on?' on':''}" data-item="${item.id}">
+    <div class="ico">${item.src&&!secret?`<img src="${item.src}" alt="">`:item.ico}</div><h3>${esc(item.name)}</h3><p>${esc(item.blurb)}</p>
+    <button class="solid" type="button">${label}</button></article>`;
+}
+function paintShop(){
+  const w=document.getElementById('shopWallet'); if(w) w.textContent=state.stars;
+  paintBuddy();
+  const g=document.getElementById('shopGrid'); if(!g) return;
+  g.innerHTML=SHOP.filter(it=>!it.secret).map(it=>shopCardHTML(it)).join('');
+  const sec=document.getElementById('shopSecrets'), unlocked=SHOP.filter(it=>it.secret&&(state.owned||[]).includes(it.id));
+  sec.innerHTML=unlocked.length?unlocked.map(it=>shopCardHTML(it,true)).join(''):'<p class="subtitle">No secret items unlocked yet.</p>';
+  document.querySelectorAll('#shopBody [data-item] button').forEach(b=>b.onclick=()=>buyOrWear(b.closest('[data-item]').dataset.item));
+  const st=document.querySelector('.top .stars'); if(st) st.textContent='⭐ '+state.stars;
+}
+function buyOrWear(id){
+  const item=SHOP.find(i=>i.id===id); if(!item) return;
+  state.owned=state.owned||[];
+  if(!state.owned.includes(id)){
+    if(state.stars<item.cost){
+      const chip=document.getElementById('shopWallet'); if(chip&&chip.parentElement.animate) chip.parentElement.animate([{transform:'scale(1)'},{transform:'scale(1.08)'},{transform:'scale(1)'}],{duration:280});
+      brutusSay(`Need ${item.cost-state.stars} more ⭐ for the ${item.name.toLowerCase()}.`); return;
+    }
+    state.stars-=item.cost; state.owned.push(id);
+  }
+  const cur=wearing(); state.wear={items:cur.includes(id)?cur.filter(x=>x!==id):cur.concat(id)};
+  save(); paintShop();
+}
+function tryChest(){
+  const inp=document.getElementById('chestWord'), feed=document.getElementById('chestFeed');
+  const word=((inp&&inp.value)||'').trim().toLowerCase(), hit=SHOP.find(it=>it.secret&&it.code===word);
+  if(!hit){if(feed) feed.textContent='Nothing happened.';return}
+  state.owned=state.owned||[]; if(!state.owned.includes(hit.id)) state.owned.push(hit.id);
+  save(); paintShop(); if(feed) feed.textContent='You found '+hit.name+'!'; if(inp) inp.value='';
 }
 function openShop(){
   const el=document.getElementById('shopOverlay');
-  document.getElementById('shopBody').innerHTML=`<div class="shopWrap">${buddyHTML()}<div>
-    <p class="small">Stars: ${state.stars}. One item per spot. Different spots can stack.</p>
-    ${SHOP.map(it=>{
-      const have=(state.owned||[]).includes(it.id);
-      const on=state.wear[it.slot]===it.id;
-      return `<div class="shopItem ${have?'have':''}">${esc(it.name)} · ${it.slot} · ${it.cost}⭐
-        ${have?`<button class="secondary" data-wear="${it.id}">${on?'Take off':'Wear'}</button>`:`<button class="primary" data-buy="${it.id}">Buy</button>`}</div>`;
-    }).join('')}</div></div>`;
+  document.getElementById('shopBody').innerHTML=`<div class="mmbShop">
+    <div class="shopTop"><div class="star-chip"><span>★</span> <strong id="shopWallet">${state.stars}</strong> stars</div></div>
+    <h1>Star shop</h1>
+    <p class="subtitle">Spend stars on looks for Brutus. Tap an owned item to put it on or take it off.</p>
+    <div class="shop-buddy" id="shopBuddyPreview"></div>
+    <h2 class="shop-section">Buddy looks</h2>
+    <div class="shop-grid" id="shopGrid"></div>
+    <h2 class="shop-section">Secret chest</h2>
+    <div class="shop-chest"><p class="subtitle" style="margin:0 0 6px">Type a secret word if you found one.</p>
+      <input id="chestWord" placeholder="secret word" autocomplete="off"><button class="solid" id="chestOpen" type="button">Open chest</button><div id="chestFeed" class="small"></div></div>
+    <div class="shop-grid" id="shopSecrets"></div></div>`;
   el.classList.add('open');
   document.getElementById('closeShop').onclick=()=>el.classList.remove('open');
-  document.getElementById('openShop2')?.addEventListener('click',openShop);
-  document.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{
-    const it=SHOP.find(s=>s.id===b.dataset.buy);
-    if(state.stars<it.cost){brutusSay('Need more stars.');return}
-    state.stars-=it.cost; state.owned=state.owned||[]; state.owned.push(it.id); save(); openShop();
-  });
-  document.querySelectorAll('[data-wear]').forEach(b=>b.onclick=()=>{
-    const it=SHOP.find(s=>s.id===b.dataset.wear);
-    state.wear=state.wear||{};
-    if(state.wear[it.slot]===it.id) delete state.wear[it.slot];
-    else state.wear[it.slot]=it.id;
-    save(); openShop();
-  });
+  document.getElementById('chestOpen').onclick=tryChest;
+  document.getElementById('chestWord').onkeydown=e=>{if(e.key==='Enter')tryChest()};
+  paintShop();
 }
 function openLook(){
   const el=document.getElementById('lookOverlay');
@@ -1271,7 +1375,7 @@ const CHIPS=['What should I do?','I’m bored','What’s this about?','Can I dra
 function brutusReply(q){
   const s=q.toLowerCase();
   const lines=[
-    [/shop|dress|bow|hat/, 'Shop is the star button up top. One thing per spot. You can stack a hat and glasses. Not two hats.'],
+    [/shop|dress|bow|hat/, 'Shop is the star button up top. Buy looks for me with your stars. Tap one you own to put it on or take it off.'],
     [/bored|wiggle/, 'Highlight one sentence. Then Play. I will stay.'],
     [/about|paragraph|article/, 'This week: Satan lies about Jehovah and Jesus. Eve, Job, Jesus, Shannon. Jehovah and Jesus are on your side.'],
     [/draw/, 'Purple pencil. Ink, watercolor, pencil, calligraphy. Pixel eraser and object eraser.'],

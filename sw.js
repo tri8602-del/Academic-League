@@ -1,4 +1,4 @@
-const CACHE = 'smb-sunday-v10';
+const CACHE = 'smb-sunday-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -12,6 +12,22 @@ const ASSETS = [
   './wt-pages/p11.jpg',
   './wt-pages/p14.jpg',
   './games/engine.js',
+  './media/img-004.jpg',
+  './media/img-042.webp',
+  './media/img-043.webp',
+  './media/img-044.webp',
+  './media/img-045.webp',
+  './media/img-046.webp',
+  './media/img-047.webp',
+  './media/img-048.webp',
+  './media/img-084.png',
+  './media/img-085.png',
+  './media/img-086.png',
+  './media/img-087.png',
+  './media/img-088.png',
+  './media/img-089.png',
+  './media/img-090.png',
+  './media/img-091.png',
   './games/w-01.html',
   './games/w-02.html',
   './games/w-03.html',
