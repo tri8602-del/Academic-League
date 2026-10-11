@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>¶5 · Lies about Jesus</title>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* Data for the shared engine (engine.js). Based only on the paragraph and the scriptures it cites. */
+window.GAME={
+ "title": "¶5 · Lies about Jesus",
+ "sub": "Satan tried to stop people from following Jesus.",
+ "done": "You know the truth about Jesus!",
+ "doneEmoji": "✨",
+ "rounds": [
+  {
+   "type": "quiz",
+   "q": "How did Satan try to stop people from following Jesus?",
+   "opts": [
+    {
+     "t": "He had hateful religious leaders and others spread lies about Jesus",
+     "e": "🗣️",
+     "ok": 1,
+     "why": "Right. Satan incited them to spread lies about Jesus."
+    },
+    {
+     "t": "He hid all the roads",
+     "e": "🛣️",
+     "why": null
+    },
+    {
+     "t": "He made it rain every day",
+     "e": "🌧️",
+     "why": null
+    }
+   ]
+  },
+  {
+   "type": "tf",
+   "items": [
+    {
+     "t": "People said things about Jesus that were not true.",
+     "ok": true,
+     "why": "True. They said he was a glutton and a drunkard — lies! (Matthew 11:19)"
+    },
+    {
+     "t": "Satan wanted people to keep following Jesus.",
+     "ok": false,
+     "why": "Right — he wanted to stop them."
+    },
+    {
+     "t": "In the end, they had Jesus put to death like a criminal.",
+     "ok": true,
+     "why": "True. They had him executed as a common criminal, even though he did nothing wrong."
+    }
+   ]
+  },
+  {
+   "type": "fill",
+   "before": "“All the same, wisdom is proved righteous by its",
+   "ans": "works",
+   "after": ".”",
+   "opts": [
+    "works",
+    "words",
+    "money",
+    "friends"
+   ],
+   "ref": "Matthew 11:19",
+   "why": "Yes! What Jesus did proved the lies wrong."
+  }
+ ],
+ "id": "w-05"
+};
+</script>
+<script src="engine.js"></script>
+</body>
+</html>
