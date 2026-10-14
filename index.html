@@ -47,6 +47,8 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:7px 4px;t
 .teamCard{border:2px solid transparent;cursor:pointer}.teamCard.active{border-color:#1f6feb}
 .rankRow{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:15px}.rk{width:18px;color:#5b6678;font-weight:700}.rn{flex:0 0 46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar{flex:1;height:10px;background:#eef2f8;border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:#1f6feb;border-radius:6px}.rv{width:32px;text-align:right;font-weight:700}
 details .li{flex-wrap:wrap;gap:6px}details .li>span:first-child{flex:1 0 100%}.step input{width:56px}
+.slot{border-top:1px solid #eef;padding:8px 0}.slotHead{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.slotHead .small{flex:1}.slotHead button{min-height:40px;padding:6px 10px;font-size:14px}.slotHead button:disabled{opacity:.35}.slotRow{margin-top:6px;align-items:center}.slotRow select,.slotRow input{min-height:42px;font-size:14px;padding:6px}
+.todayCard{border:2px solid #ffd24a}.tslot{border-top:1px solid #eef;padding:8px 6px;border-radius:8px}.tslot.now{background:#e7f8ee}.tslot.next{background:#eef4ff}.tsHead{display:flex;gap:8px;align-items:center}.tsRow{display:flex;align-items:center;gap:8px;margin-top:4px;font-size:14px}.tsRow span{flex:1}.tsRow button{min-height:42px;padding:6px 10px;font-size:14px}
 .warn{background:#fff3d6;border-radius:10px;padding:8px 10px;font-size:14px;margin:6px 0}
 .report{background:#fff;border-radius:14px;padding:16px;font-size:14px}.rhead{border-bottom:2px solid #1f3a5f;margin-bottom:10px}.rhead h1{font-size:20px;margin:0}.rhead div{color:#5b6678;font-size:12px}.report h2{font-size:16px;margin:14px 0 6px}.rt{font-size:13px}.rt td{white-space:nowrap}.rt th{background:#eef2f8}
 nav button{font-size:12px}
@@ -68,7 +70,7 @@ const CATS=["Math","ELA/Literature","History/Current Events","Mythology","Scienc
 // Older categories are counted under the combined names (saved events are not rewritten).
 const normCat=c=>c==="ELA"||c==="Literature"?"ELA/Literature":c==="History"?"History/Current Events":c;
 let cat=null;
-S.practices??=[]; // practices (added later; older data simply has none)
+S.practices??=[];S.schedule??=[]; // practices / event-day schedule (added later; older data simply has none)
 let tab="home",prf=null,rep=null,sel=null,draft=null,subPick=null,tf={step:0},adjOpen=false,pf=null;
 const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
 const uid=()=>Math.random().toString(36).slice(2,9);
@@ -269,7 +271,7 @@ function savePast(){if(!pf.opp.trim())return alert("Enter the opponent.");if(pf.
  const i=S.matches.findIndex(x=>x.id===m.id);if(i>=0)S.matches[i]=m;else S.matches.push(m);S.team=m.team;pf=null;tab="stats";save();render()}
 function delMatch(id){if(confirm("Delete this match and its stats?")){S.matches=S.matches.filter(m=>m.id!==id);Object.keys(S.curBy).forEach(k=>{if(S.curBy[k]===id)S.curBy[k]=null});save();render()}}
 function exp(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:"application/json"}));a.download=`league-coach-backup-${new Date().toLocaleDateString("en-CA")}.json`;a.click();S.lastBackup=new Date().toISOString();save();render()}
-function imp(inp){const f=inp.files[0];if(!f)return;f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.roster)||!Array.isArray(d.matches))throw 0;if(confirm(`Replace everything with this backup (${d.roster.length} students, ${d.matches.length} matches, ${(d.practices||[]).length} practices)?`)){S=d;S.practices??=[];S.team??="V";S.curBy??={V:S.cur||null,JV:null};delete S.cur;S.roster.forEach(p=>p.team??="V");S.matches.forEach(m=>m.team??="V");save();render()}}catch{alert("That file isn't a League Coach backup.")}inp.value=""})}
+function imp(inp){const f=inp.files[0];if(!f)return;f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.roster)||!Array.isArray(d.matches))throw 0;if(confirm(`Replace everything with this backup (${d.roster.length} students, ${d.matches.length} matches, ${(d.practices||[]).length} practices)?`)){S=d;S.practices??=[];S.schedule??=[];S.team??="V";S.curBy??={V:S.cur||null,JV:null};delete S.cur;S.roster.forEach(p=>p.team??="V");S.matches.forEach(m=>m.team??="V");save();render()}}catch{alert("That file isn't a League Coach backup.")}inp.value=""})}
 // ================= practices =================
 const teamPractices=t=>S.practices.filter(p=>p.team===(t||S.team)).sort((a,b)=>a.date<b.date?1:-1);
 function practiceStats(t){const ps=teamPractices(t),o={};ps.forEach(pr=>{Object.keys(pr.att||{}).forEach(id=>{const x=o[id]??={n:0,att:0,c:0,w:0};x.n++;if(pr.att[id]==="P"){x.att++;const q=pr.st?.[id];if(q){x.c+=q.c||0;x.w+=q.w||0}}})});return o}
@@ -307,7 +309,7 @@ function vHome(){const card=t=>{const sm=teamSummary(t),sr=seasonRank(t),top=sr.
   <div class="small">${sm.last?`Last: ${lt.us>lt.them?"W":lt.us<lt.them?"L":"T"} ${lt.us}–${lt.them} vs ${esc(sm.last.opp)} (${fmtDate(sm.last.date)})`:"No matches yet"} · Practice attendance: ${sm.patt==null?"–":sm.patt+"%"} (${sm.np} practices)</div>
   ${top.length?`<div style="margin-top:8px">${top.map((id,i)=>{const p=S.roster.find(x=>x.id===id);return `<div class="rankRow"><span class="rk">${i+1}</span><span class="rn">${esc(p.name)} <span class="small">${p.grade?"Gr "+p.grade:""}</span></span><span class="bar"><i style="width:${Math.max(4,sr.score[id]/mx*100)}%"></i></span><span class="rv">${sr.info[id].avg!=null?sr.info[id].avg.toFixed(1):"–"}</span></div>`}).join("")}<div class="small" style="text-align:right">avg pts / round</div></div>`:'<p class="small">Rankings appear after the first match or practice.</p>'}
   <div class="grid2" style="margin-top:10px"><button class="pri" onclick="setTeam('${t}');tab='match';render()">▶ Start match</button><button onclick="S.team='${t}';openPractice()">📝 Log practice</button><button onclick="S.team='${t}';openPast()">＋ Past match</button><button onclick="setTeam('${t}');tab='reports';render()">🖨 Reports</button></div></div>`};
- return `${card("V")}${card("JV")}<div class="card"><h2>Backup</h2>${backupCard()}</div><p class="small">${BLEND_TEXT}</p>`}
+ return `${vEventCard()}${card("V")}${card("JV")}<div class="card"><h2>Backup</h2>${backupCard()}</div><p class="small">${BLEND_TEXT}</p>`}
 function backupCard(){const lb=S.lastBackup?new Date(S.lastBackup):null,days=lb?Math.floor((Date.now()-lb)/864e5):null;
  return `<p class="small">${lb?`Last backed up ${lb.toLocaleDateString("en-US")}${days?` (${days} day${days>1?"s":""} ago)`:" (today)"}`:"Not backed up yet on this device."}</p>${!lb||days>7?'<p class="warn">💾 Time for a backup – tap Export and save the file to Files or email it to yourself.</p>':""}
  <div class="row"><button class="pri" onclick="exp()">⬇ Export backup</button><button onclick="$('#imp').click()">⬆ Import backup</button></div><input type="file" id="imp" accept=".json,application/json" style="display:none" onchange="imp(this)">`}
@@ -338,7 +340,34 @@ function vReports(){rep??={type:"team"};const ms=teamMatches().slice().sort((a,b
  ${rep.type==="match"?`<select class="gradeSel full" style="margin-top:8px;width:100%" onchange="rep.id=this.value;render()"><option value="">Choose a match…</option>${ms.map(m=>`<option value="${m.id}" ${rep.id===m.id?"selected":""}>${fmtDate(m.date)} vs ${esc(m.opp)}</option>`).join("")}</select>`:""}
  <button class="pri full" style="margin-top:10px" onclick="window.print()">🖨 Print / Save as PDF</button><p class="small">On iPhone/iPad: Print, then pinch out on the preview (or Share → Save to Files) to keep a PDF.</p></div>
  <div class="report">${reportHTML()}</div>`}
-function render(){$("#teamSw").innerHTML=Object.entries(TEAMS).map(([k,l])=>`<button class="${S.team===k?"on":""}" onclick="setTeam('${k}')">${l}</button>`).join("");const m=M();$("#app").innerHTML=tab==="home"?vHome():tab==="roster"?vRoster():tab==="match"?vMatch():tab==="practice"?vPractice():tab==="reports"?vReports():vStats();
+// ================= event-day schedule =================
+const SLOTS=[["M1","9:15","9:45"],["M2","9:50","10:20"],["M3","10:25","10:55"],["M4","11:00","11:30"],["M5","11:35","12:05"],["M6","12:10","12:40"]];
+const ROOMS=["319 Meeting Room","321 Corner Room","313 Hallway Room","311A Tiny Room"];
+const toMin=t=>{const [h,m]=t.split(":").map(Number);return (h<8?h+12:h)*60+m};
+const fmtT=t=>{const h=+t.split(":")[0];return t+(h>=9&&h<12?" AM":" PM")};
+const todayKey=()=>new Date().toLocaleDateString("en-CA");
+function schDays(){return [...S.schedule].sort((a,b)=>!a.date?1:!b.date?-1:a.date<b.date?-1:1)} // undated (just added) last
+function addEventDay(){S.schedule.push({id:uid(),date:"",byeV:false,byeJV:false,slots:{}});save();render()}
+function schSet(id,k,v){const d=S.schedule.find(x=>x.id===id);d[k]=v;if(k==="byeV"&&v)Object.values(d.slots).forEach(sl=>delete sl.V);if(k==="byeJV"&&v)Object.values(d.slots).forEach(sl=>delete sl.JV);save();render()}
+function schTeam(id,slot,t){const d=S.schedule.find(x=>x.id===id);const sl=d.slots[slot]??={};if(sl[t])delete sl[t];else sl[t]={room:"",opp:""};save();render()}
+function schField(id,slot,t,k,v){S.schedule.find(x=>x.id===id).slots[slot][t][k]=v;save()}
+function schDel(id){if(confirm("Delete this competition date and its schedule?")){S.schedule=S.schedule.filter(x=>x.id!==id);save();render()}}
+function vSchedule(){return `<div class="card"><h2>Competition dates</h2><p class="small">Up to 5 dates in the season. Mark a bye for a team, then set each time slot: tap Varsity and/or JV (none = Open), pick the room and the opponent.</p></div>
+ ${schDays().map(d=>`<div class="card"><div class="row" style="align-items:center"><input type="date" value="${esc(d.date)}" onchange="schSet('${d.id}','date',this.value)"><button class="bad" style="flex:0 0 auto;min-height:44px;font-size:14px" onclick="schDel('${d.id}')">Delete</button></div>
+  <div class="row" style="margin:8px 0">${["V","JV"].map(t=>`<button class="${d["bye"+t]?"opp":""}" style="min-height:44px;font-size:15px" onclick="schSet('${d.id}','bye${t}',${!d["bye"+t]})">${d["bye"+t]?"✓ ":""}${TEAMS[t]} bye</button>`).join("")}</div>
+  ${SLOTS.map(([k,a,b])=>{const sl=d.slots[k]||{};const open=!sl.V&&!sl.JV;return `<div class="slot"><div class="slotHead"><b>${k}</b><span class="small">${fmtT(a)}–${fmtT(b)}</span>${["V","JV"].map(t=>`<button class="${sl[t]?"pri":""}" ${d["bye"+t]?"disabled":""} onclick="schTeam('${d.id}','${k}','${t}')">${TEAMS[t]}</button>`).join("")}${open?'<span class="tag" style="background:#eef2f8;color:#5b6678">Open</span>':""}</div>
+   ${["V","JV"].filter(t=>sl[t]).map(t=>`<div class="row slotRow"><span class="small" style="flex:0 0 52px"><b>${TEAMS[t]}</b></span><select class="gradeSel" onchange="schField('${d.id}','${k}','${t}','room',this.value)"><option value="">Room…</option>${ROOMS.map(r=>`<option ${sl[t].room===r?"selected":""}>${r}</option>`).join("")}</select><input placeholder="Opponent" value="${esc(sl[t].opp)}" onchange="schField('${d.id}','${k}','${t}','opp',this.value)"></div>`).join("")}</div>`}).join("")}</div>`).join("")}
+ <button class="pri full" onclick="addEventDay()">＋ Add competition date</button>`}
+function startFromSlot(t,opp){S.team=t;draft=null;tab="match";save();render();if(!M()){draft.opp=opp||"";render()}}
+function daySummary(d){return ["V","JV"].map(t=>d["bye"+t]?`${TEAMS[t]}: bye`:`${TEAMS[t]}: ${SLOTS.filter(([k])=>d.slots[k]?.[t]).length} match${SLOTS.filter(([k])=>d.slots[k]?.[t]).length===1?"":"es"}`).join(" · ")}
+function vEventCard(){const today=todayKey(),d=S.schedule.find(x=>x.date===today);
+ if(!d){const nx=schDays().find(x=>x.date&&x.date>today);return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">📅 Next event</h2><button style="min-height:40px;font-size:14px" onclick="tab='schedule';render()">Schedule</button></div><p style="margin:8px 0 0">${nx?`<b>${fmtDate(nx.date)}</b> – ${daySummary(nx)}`:'<span class="small">No upcoming competition dates. Add them on the Schedule screen.</span>'}</p></div>`}
+ const now=new Date(),nm=now.getHours()*60+now.getMinutes();const cur=SLOTS.find(([,a,b])=>nm>=toMin(a)&&nm<toMin(b)),nxt=SLOTS.find(([,a])=>toMin(a)>nm);
+ return `<div class="card todayCard"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">📍 Today's schedule</h2><button style="min-height:40px;font-size:14px" onclick="tab='schedule';render()">Edit</button></div><p class="small" style="margin:4px 0 8px">${fmtDate(d.date)} · ${daySummary(d)}</p>
+ ${SLOTS.map(([k,a,b])=>{const sl=d.slots[k]||{},mark=cur&&cur[0]===k?"now":(!cur&&nxt&&nxt[0]===k)||(cur&&nxt&&nxt[0]===k)?"next":"";const ts=["V","JV"].filter(t=>sl[t]);
+  return `<div class="tslot ${mark}"><div class="tsHead"><b>${k}</b> <span>${fmtT(a)}–${fmtT(b)}</span>${mark?`<span class="tag ${mark==="now"?"tin":""}" style="${mark==="next"?"background:#e3eeff;color:#1f3a5f":""}">${mark==="now"?"NOW":"NEXT"}</span>`:""}</div>
+  ${ts.length?ts.map(t=>`<div class="tsRow"><span><b>${TEAMS[t]}</b> · ${esc(sl[t].room||"room ?")}${sl[t].opp?` · vs ${esc(sl[t].opp)}`:""}</span><button class="pri" onclick="startFromSlot('${t}',${esc(JSON.stringify(sl[t].opp||""))})">▶ Start this match</button></div>`).join(""):'<div class="small">Open – no match for us</div>'}</div>`}).join("")}</div>`}
+function render(){$("#teamSw").innerHTML=Object.entries(TEAMS).map(([k,l])=>`<button class="${S.team===k?"on":""}" onclick="setTeam('${k}')">${l}</button>`).join("");const m=M();$("#app").innerHTML=tab==="home"?vHome():tab==="roster"?vRoster():tab==="match"?vMatch():tab==="practice"?vPractice():tab==="reports"?vReports():tab==="schedule"?vSchedule():vStats();
  $("#nav").innerHTML=[["home","🏠 Home"],["roster","👥 Roster"],["match",m&&!m.done?"🔴 Live":"🏁 Match"],["practice","📝 Practice"],["stats","📊 Stats"]].map(([k,l])=>`<button class="${tab===k?"on":""}" onclick="tab='${k}';render()">${l}</button>`).join("")}
 render();
 if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
