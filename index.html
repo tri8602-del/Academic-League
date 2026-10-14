@@ -37,6 +37,8 @@ nav button.on{color:#1f6feb}
 .cats{display:flex;flex-wrap:wrap;gap:6px}.cats button{flex:1 0 28%;min-height:46px;padding:8px 6px;font-size:15px;background:#fff3d6;border:2px solid transparent}.cats button.on{background:#ffd24a;border-color:#b98800}
 .gradeSel{width:auto;min-height:44px;padding:6px;font:inherit;font-size:15px;border:1px solid #c8d0dc;border-radius:10px;background:#fff}
 .att{display:flex;gap:4px}.att button{min-height:40px;padding:6px 10px;font-size:14px}
+.lrow{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid #eef}.lrow span{flex:1}.lrow button{min-height:48px;padding:6px 10px;font-size:15px}
+.step{display:flex;align-items:center;gap:6px}.step input{width:64px;text-align:center;padding:8px}.step button{min-height:40px;min-width:40px;padding:4px}
 .small{font-size:13px;color:#5b6678}
 table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:7px 4px;text-align:center;border-bottom:1px solid #eef}th:first-child,td:first-child{text-align:left}
 .tag{font-size:12px;padding:2px 7px;border-radius:999px;font-weight:700}.tin{background:#d8f3e2;color:#14743a}.tout{background:#fde2e2;color:#a12a2a}
@@ -54,10 +56,12 @@ S.team??="V";S.curBy??={V:S.cur||null,JV:null};delete S.cur;S.roster.forEach(p=>
 const TEAMS={V:"Varsity",JV:"JV"};
 const teamRoster=()=>S.roster.filter(p=>p.team===S.team);
 const teamMatches=()=>S.matches.filter(m=>(m.team||"V")===S.team);
-function setTeam(t){S.team=t;draft=null;subPick=null;sel=null;cat=null;save();render()}
-const CATS=["Math","ELA","History","Mythology","Literature","Science","Other"];
+function setTeam(t){S.team=t;draft=null;subPick=null;sel=null;cat=null;tf={step:0};save();render()}
+const CATS=["Math","ELA/Literature","History/Current Events","Mythology","Science","Sports","Geography","Other"];
+// Older categories are counted under the combined names (saved events are not rewritten).
+const normCat=c=>c==="ELA"||c==="Literature"?"ELA/Literature":c==="History"?"History/Current Events":c;
 let cat=null;
-let tab="roster",sel=null,draft=null,subPick=null;
+let tab="roster",sel=null,draft=null,subPick=null,tf={step:0},adjOpen=false,pf=null;
 const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
 const uid=()=>Math.random().toString(36).slice(2,9);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -72,7 +76,7 @@ const buzzRate=s=>s&&s.c+s.w?s.w/(s.c+s.w):0;
 // Lightning: per finished round, correct out of 5 and the 4 players who were in.
 // Categories (toss-ups only). Team: our correct/wrong regardless of player; players: their own buzzes.
 const US_C=["usC","oppWusS"],US_W=["usW","usWoppS","oppWusW"];
-function catStats(events){const team={},pl={};events.forEach(e=>{if(!e.cat||e.q>15)return;const r=US_C.includes(e.code)?"c":US_W.includes(e.code)?"w":null;if(!r)return;const t=team[e.cat]??={c:0,w:0};t[r]++;if(e.pid){const x=(pl[e.pid]??={})[e.cat]??={c:0,w:0};x[r]++}});return{team,pl}}
+function catStats(events){const team={},pl={};events.forEach(e=>{if(!e.cat||e.q>15)return;e={...e,cat:normCat(e.cat)};const r=US_C.includes(e.code)?"c":US_W.includes(e.code)?"w":null;if(!r)return;const t=team[e.cat]??={c:0,w:0};t[r]++;if(e.pid){const x=(pl[e.pid]??={})[e.cat]??={c:0,w:0};x[r]++}});return{team,pl}}
 function bestCats(pc){if(!pc)return[];return Object.entries(pc).filter(([,v])=>v.c>0).sort((a,b)=>(b[1].c-b[1].w)-(a[1].c-a[1].w)||b[1].c-a[1].c).slice(0,2).map(([k,v])=>`${k} ${v.c}/${v.c+v.w}`)}
 function catTable(events){const {team,pl}=catStats(events);const cs=CATS.filter(c=>team[c]);if(!cs.length)return '<p class="small">No categories tagged yet.</p>';
  const ids=Object.keys(pl);return `<table><tr><th>Category</th><th>✓</th><th>✗</th><th>Acc</th></tr>${cs.map(c=>`<tr><td>${c}</td><td>${team[c].c}</td><td>${team[c].w}</td><td>${acc(team[c])}%</td></tr>`).join("")}</table>
@@ -81,6 +85,7 @@ function lightningRounds(ms){const out=[];ms.forEach(m=>[1,2].forEach(r=>{const 
 function lightningByPlayer(rounds){const o={};rounds.forEach(x=>x.players.forEach(id=>{o[id]??={n:0,sum:0};o[id].n++;o[id].sum+=x.correct}));return o}
 const acc=s=>s&&s.c+s.w?Math.round(s.c/(s.c+s.w)*100):null;
 function seasonStats(excludeId){return pstats(teamMatches().filter(m=>m.id!==excludeId).flatMap(m=>m.events))}
+const CODE_LABEL={usC:"Our correct",usW:"Our wrong",usWoppS:"Our wrong, opp steal",oppC:"Opp correct",oppWusS:"Our steal ✓",oppWusW:"Our steal ✗",oppW:"Opp wrong",none:"No buzz",lC:"⚡ correct",lW:"⚡ incorrect"};
 // outcomes: res c/w applies to pid
 const TOSS=[
  ["usC","✓ Our player correct  +2","ok",{us:2,res:"c",need:1}],
@@ -92,18 +97,23 @@ const TOSS=[
  ["oppW","Opp wrong, no steal","opp",{}],
  ["none","No answer","mut",{}]];
 // Lightning is team-only: no player credit, counted per round as x/5 with that round's 4 players.
-const LIGHT=[["lC","✓ Correct  +2","ok",{us:2}],["lW","✗ Wrong / no answer","bad",{}]];
+const LIGHT=[["lC","✓ Correct  +1","ok",{us:1}],["lW","✗ Wrong / no answer","bad",{}]];
 function record(code){const m=M();const lightning=m.q>15;const o=(lightning?LIGHT:TOSS).find(x=>x[0]===code)[3];
   if(o.need&&!sel){alert("Tap the player who answered first.");return}
   m.events.push({round:m.round,q:m.q,code,cat:lightning?null:cat,pid:o.res&&!lightning?sel:null,res:o.res||null,us:o.us||0,them:o.them||0});
-  sel=null;cat=null;m.q++;if(m.q>20){if(m.round===1){m.stage="sub"}else{m.stage="done";m.done=true}}save();render()}
-function undo(){const m=M();const e=m.events.pop();if(!e)return;m.round=e.round;m.q=e.q;m.stage="live";if(e.q<=15&&m.lightLineups)m.lightLineups[e.round-1]=null;m.done=false;sel=null;save();render()}
+  sel=null;cat=null;tf={step:0};m.q++;if(m.q>20){if(m.round===1){m.stage="sub"}else{m.stage="done";m.done=true}}save();render()}
+function undo(){const m=M();const e=m.events.pop();if(!e)return;tf={step:0};if(e.code==="adj"){save();render();return}m.round=e.round;m.q=e.q>15?16:e.q;m.stage="live";if(e.q<=15&&m.lightLineups)m.lightLineups[e.round-1]=null;m.done=false;sel=null;save();render()}
 // ---- views ----
 function vRoster(){return `<div class="card"><h2>${TEAMS[S.team]} roster (${teamRoster().length})</h2>
- ${teamRoster().map(p=>`<div class="li"><span>${esc(p.name)}</span><select class="gradeSel" aria-label="Grade" onchange="setGrade('${p.id}',this.value)">${gradeOpts(p.grade)}</select><button onclick="moveTeam('${p.id}')">→ ${S.team==="V"?"JV":"Varsity"}</button><button onclick="ren('${p.id}')">Edit</button><button class="bad" onclick="del('${p.id}')">Remove</button></div>`).join("")||'<p class="small">No students yet.</p>'}
+ ${teamRoster().map(p=>`<div class="li"><span>${esc(p.name)}</span><select class="gradeSel" aria-label="Grade" onchange="setGrade('${p.id}',this.value)">${gradeOpts(p.grade)}</select><button onclick="moveTeam('${p.id}')">→ ${S.team==="V"?"JV":"Varsity"}</button><button onclick="ren('${p.id}')">Edit</button><button class="bad" onclick="del('${p.id}')">Remove</button></div>`).join("")||`<p class="small">No students yet.</p><button class="pri full" onclick="loadTcal()">Load 2026-27 TCAL ${TEAMS[S.team]} roster</button>`}
  <div class="row" style="margin-top:12px"><input id="newName" placeholder="Student name" onkeydown="if(event.key==='Enter')add()"><select id="newGrade" class="gradeSel" aria-label="Grade" style="flex:0 0 84px">${gradeOpts("")}</select><button class="pri" style="flex:0 0 90px" onclick="add()">Add</button></div></div>
  <div class="card"><h2>Backup</h2><div class="row"><button onclick="exp()">Export JSON</button><button onclick="$('#imp').click()">Import JSON</button></div><input type="file" id="imp" accept=".json,application/json" style="display:none" onchange="imp(this)"></div>`}
 function add(){const v=$("#newName").value.trim();if(!v)return;const g=+$("#newGrade").value;S.roster.push({id:uid(),name:v,team:S.team,...(g?{grade:g}:{})});save();render();setTimeout(()=>$("#newName").focus(),0)}
+const TCAL={JV:[["Dan Cox",9],["Brody Dean",9],["Molly Gullett",9],["Bailey Litten",9],["John Pecjak",9],["Sam Chulick",10],["Gracie Harn",10],["Lydia Hrin",10],["Kolton Litten",10],["Kira McCollum",10],["James Shaffer",10],["Adam Wamsley",10]],
+ V:[["Emilee Bazzoli",12],["Lucca Jellots",12],["Logan Yeck",12],["Molly Belk",11],["Kerrington Brown",11],["Nick Efaw",11],["Emily Hoyle",11],["Dakotah Karkowski",11],["Ashdyn Kern",11],["Kelsey Vessels",11],["Kara Wamsley",11]]};
+// One tap, only offered while this team's roster is empty. A name already in the app (any team) is reused: moved to this team, grade set. No duplicates.
+function loadTcal(){const key=n=>n.trim().toLowerCase().replace(/\s+/g," ");let added=0,moved=0;
+ TCAL[S.team].forEach(([n,g])=>{const ex=S.roster.find(p=>key(p.name)===key(n));if(ex){ex.team=S.team;ex.grade=g;moved++}else{S.roster.push({id:uid(),name:n,team:S.team,grade:g});added++}});save();render();setTimeout(()=>alert(`Loaded ${TEAMS[S.team]} roster: ${added} added${moved?`, ${moved} already in the app (team/grade updated)`:""}.`),50)}
 function moveTeam(id){const p=S.roster.find(x=>x.id===id);p.team=p.team==="V"?"JV":"V";save();render()}
 // Grade level 9-12 (optional). Students without one just sort last on ties.
 const gradeOpts=g=>`<option value="">Gr –</option>`+[9,10,11,12].map(n=>`<option value="${n}" ${+g===n?"selected":""}>Gr ${n}</option>`).join("");
@@ -113,9 +123,10 @@ function ren(id){const p=S.roster.find(x=>x.id===id);const v=prompt("Name",p.nam
 function del(id){if(confirm(`Remove ${nm(id)} from the roster? (Past stats are kept.)`)){S.roster=S.roster.filter(p=>p.id!==id);save();render()}}
 function vMatch(){const m=M();
  if(m&&!m.done){if(m.stage==="sub")return vSub(m);return vLive(m)}
+ if(pf)return vPast();
  draft??={opp:"",date:new Date().toLocaleDateString("en-CA"),travel:[],start:[],att:{}};draft.att??={};
  const step=draft.travel.length===8;
- return `<div class="card"><h2>New match</h2><input id="opp" placeholder="Opponent" value="${esc(draft.opp)}" oninput="draft.opp=this.value"><div style="height:8px"></div><input id="dt" type="date" value="${draft.date}" oninput="draft.date=this.value"></div>
+ return `<button class="full" style="margin-bottom:12px;background:#fff3d6" onclick="openPast()">＋ Add a past match (enter results after the fact)</button><div class="card"><h2>New match</h2><input id="opp" placeholder="Opponent" value="${esc(draft.opp)}" oninput="draft.opp=this.value"><div style="height:8px"></div><input id="dt" type="date" value="${draft.date}" oninput="draft.date=this.value"></div>
  <div class="card"><h2>Attendance <span class="small">(${teamRoster().filter(p=>draft.att[p.id]!=="A").length} present)</span></h2><p class="small">Everyone starts Present. Tap to mark Absent – absent students can't be picked for the room.</p>${teamRoster().map(p=>`<div class="li"><span>${esc(p.name)}</span>${attBtns(draft.att[p.id]||"P",`setDraftAtt('${p.id}',X)`)}</div>`).join("")}</div>
  <div class="card"><h2>Travel 8 <span class="small">(${draft.travel.length}/8 in the room)</span></h2><div class="chips">${teamRoster().filter(p=>draft.att[p.id]!=="A").map(p=>{const on=draft.travel.includes(p.id);return `<button class="chip ${on?"on":""} ${!on&&step?"lock":""}" onclick="tg('travel','${p.id}',8)">${esc(p.name)}</button>`}).join("")||'<p class="small">Add students on the Roster tab first.</p>'}</div></div>
  ${step?`<div class="card"><h2>Starting 4 <span class="small">(${draft.start.length}/4)</span></h2><div class="chips">${draft.travel.map(id=>{const on=draft.start.includes(id);return `<button class="chip ${on?"on":""} ${!on&&draft.start.length===4?"lock":""}" onclick="tg('start','${id}',4)">${esc(nm(id))}</button>`}).join("")}</div></div>`:""}
@@ -124,7 +135,7 @@ function vMatch(){const m=M();
 const attBtns=(v,fn)=>`<span class="att"><button class="${v==="P"?"ok":""}" onclick="${fn.replace("X","'P'")}">Present</button><button class="${v==="A"?"bad":""}" onclick="${fn.replace("X","'A'")}">Absent</button></span>`;
 function setDraftAtt(id,v){draft.att[id]=v;if(v==="A"){draft.travel=draft.travel.filter(x=>x!==id);draft.start=draft.start.filter(x=>x!==id)}render()}
 function attOf(m,id){const a=m.attendance?.[id];if(a)return a;return m.travel.includes(id)?"P":null}
-function setMatchAtt(mid,id,v){const m=S.matches.find(x=>x.id===mid);if(v==="A"&&m.travel.includes(id))return alert(`${nm(id)} was in the room for this match, so they can't be marked absent.`);m.attendance??={};m.attendance[id]=v;save();render()}
+function setMatchAtt(mid,id,v){const m=S.matches.find(x=>x.id===mid);if(v==="A"&&m.travel.includes(id))return alert(`${nm(id)} was in the room for this match, so they can't be marked absent.`);m.attendance??={};m.attendance[id]=v;if(m.pastForm)m.pastForm.att[id]=v;save();render()}
 function attTable(){const ms=teamMatches(),n=ms.length;if(!n)return "";const rows=teamRoster().map(p=>{const att=ms.filter(m=>attOf(m,p.id)==="P").length,ab=ms.filter(m=>attOf(m,p.id)==="A").length;return `<tr><td>${esc(p.name)}</td><td><b>${att}/${n}</b></td><td>${ab||""}</td></tr>`}).join("");
  return `<div class="card"><h2>Attendance – season</h2><p class="small">Matches attended out of ${TEAMS[S.team]} matches. Absences don't affect accuracy.</p><table><tr><th>Player</th><th>Attended</th><th>Absent</th></tr>${rows}</table></div>`}
 function tg(k,id,max){const a=draft[k];const i=a.indexOf(id);if(i>=0){a.splice(i,1);if(k==="travel")draft.start=draft.start.filter(x=>x!==id)}else if(a.length<max)a.push(id);render()}
@@ -139,13 +150,52 @@ function vLightPick(m){lightPick??=[...(m.lightLineups?.[m.round-1]||m.travel)];
  <button class="pri full" onclick="setLight()">Start lightning (${lightPick.length} players)</button><div style="height:8px"></div><button class="full" onclick="lightPick=null;undo()">↶ Undo last question</button>`}
 function tgLight(id){const i=lightPick.indexOf(id);if(i>=0)lightPick.splice(i,1);else lightPick.push(id);render()}
 function setLight(){if(!lightPick.length)return alert("Pick at least one player.");const m=M();m.lightLineups??=[null,null];m.lightLineups[m.round-1]=[...lightPick];m.lightEdit=false;lightPick=null;save();render()}
+// ---- toss-up step flow: Buzz/No buzz -> Our kid/Opponent -> Correct/Incorrect -> Steal/No steal -> steal result.
+// Each path ends in one of the TOSS outcome codes, so stats and older matches work the same.
+function tfSet(k,v){tf[k]=v;tf.step++;
+ if(k==="buzz"&&v==="no")return record("none");
+ if(k==="res"&&v==="c")return record(tf.who==="us"?"usC":"oppC");
+ if(k==="steal"&&v==="no")return record(tf.who==="us"?"usW":"oppW");
+ render()}
+function tfBack(){const order=["buzz","who","pid","res","steal"];tf.step=Math.max(0,tf.step-1);if(tf.step===2&&tf.who!=="us")tf.step=1;const k=order[tf.step];delete tf[k];if(k==="pid")sel=null;render()}
+function stealResult(ok){const us=tf.who==="us";record(us?(ok?"usWoppS":"usW"):(ok?"oppWusS":"oppWusW"))}
+function vToss(m,lu){const big='style="min-height:84px;font-size:20px"';const crumbs=[tf.buzz&&"Buzz",tf.who&&(tf.who==="us"?"Our kid":"Opponent"),sel&&tf.who==="us"&&esc(nm(sel)),tf.res&&(tf.res==="c"?"Correct":"Incorrect"),tf.steal&&"Steal"].filter(Boolean).join(" → ");
+ let body;
+ if(tf.step===0)body=`<div class="grid2"><button class="pri" ${big} onclick="tfSet('buzz','yes')">🔔 Buzz</button><button class="mut" ${big} onclick="tfSet('buzz','no')">No buzz</button></div>`;
+ else if(tf.step===1)body=`<div class="grid2"><button class="ok" ${big} onclick="tf.who='us';tf.step=2;render()">Our kid</button><button class="opp" ${big} onclick="tf.who='opp';tf.step=3;render()">Opponent</button></div>`;
+ else if(tf.step===2)body=`<div class="small" style="margin-bottom:6px">Which player buzzed?</div><div class="chips">${lu.map(id=>`<button class="chip" style="min-height:64px" onclick="sel='${id}';tf.pid='${id}';tf.step=3;render()">${esc(nm(id))}</button>`).join("")}</div>`;
+ else if(tf.step===3)body=`<div class="grid2"><button class="ok" ${big} onclick="tfSet('res','c')">✓ Correct${tf.who==="us"?" +2":" +2 opp"}</button><button class="bad" ${big} onclick="tfSet('res','w')">✗ Incorrect</button></div>`;
+ else if(tf.step===4)body=`<div class="small" style="margin-bottom:6px">${tf.who==="us"?"Does the opponent steal?":"Do we steal?"}</div><div class="grid2"><button class="${tf.who==="us"?"opp":"ok"}" ${big} onclick="tfSet('steal','yes')">Steal</button><button class="mut" ${big} onclick="tfSet('steal','no')">No steal</button></div>`;
+ else body=(tf.who==="opp"?`<div class="small" style="margin-bottom:6px">Our steal – who? (optional)</div><div class="chips" style="margin-bottom:8px">${lu.map(id=>`<button class="chip ${sel===id?"on":""}" onclick="sel=sel==='${id}'?null:'${id}';render()">${esc(nm(id))}</button>`).join("")}</div>`:"")+`<div class="grid2"><button class="ok" ${big} onclick="stealResult(true)">✓ Steal correct${tf.who==="us"?" +1 opp":" +1"}</button><button class="bad" ${big} onclick="stealResult(false)">✗ Steal incorrect</button></div>`;
+ return `<div class="card"><div class="small" style="margin-bottom:8px;min-height:18px">${crumbs||"Toss-up: did anyone buzz?"}${tf.step?` · <a href="#" onclick="tfBack();return false">← back</a>`:""}</div>${body}</div>`}
+// ---- lightning: all 5 listed. Answer / Pass / ✓ / ✗ per question; passed ones can be answered later. 1 point each.
+function lEv(m,q){return m.events.find(e=>e.round===m.round&&e.q===q&&e.code!=="adj")}
+function lState(m,q){return m.lstate?.[m.round]?.[q]}
+function lSet(q,v){const m=M();m.lstate??={};(m.lstate[m.round]??={})[q]=v;save();render()}
+function lMark(q,ok){const m=M();const e=lEv(m,q);const code=ok?"lC":"lW";
+ if(e){e.code=code;e.us=ok?1:0}else m.events.push({round:m.round,q,code,cat:null,pid:null,res:null,us:ok?1:0,them:0});
+ lSet(q,"done")}
+function lFinish(){const m=M();const open=[16,17,18,19,20].filter(q=>!lEv(m,q));
+ if(open.length&&!confirm(`${open.length} question${open.length>1?"s are":" is"} not marked. Count ${open.length>1?"them":"it"} as incorrect and finish lightning?`))return;
+ open.forEach(q=>m.events.push({round:m.round,q,code:"lW",cat:null,pid:null,res:null,us:0,them:0}));
+ m.q=21;if(m.round===1)m.stage="sub";else{m.stage="done";m.done=true}save();render()}
+function vLightning(m,lu){const qs=[16,17,18,19,20];const ev=qs.map(q=>lEv(m,q));const c=ev.filter(e=>e?.code==="lC").length,w=ev.filter(e=>e?.code==="lW").length;
+ return `<div class="card"><div class="small">Lightning is team-only, 1 point each. In (${lu.length}): ${lu.map(id=>esc(nm(id))).join(", ")} <a href="#" onclick="M().lightEdit=true;render();return false">change</a></div>
+ <div class="qbar" style="margin:8px 0 4px">✓ ${c} correct · ✗ ${w} incorrect · ${5-c-w} open</div>
+ ${qs.map((q,i)=>{const e=ev[i],st=lState(m,q);const label=e?(e.code==="lC"?'<span class="tag tin">✓ Correct</span>':'<span class="tag tout">✗ Incorrect</span>'):st==="pass"?'<span class="tag" style="background:#fff3d6;color:#8a5a00">Passed</span>':st==="ans"?'<span class="tag" style="background:#e3eeff;color:#1f3a5f">Answered</span>':"";
+  return `<div class="lrow"><b>Q${q-15}</b><span>${label}</span><button class="${st==="ans"?"pri":""}" onclick="lSet(${q},'ans')">Answer</button><button onclick="lSet(${q},'pass')">Pass</button><button class="ok" onclick="lMark(${q},true)">✓</button><button class="bad" onclick="lMark(${q},false)">✗</button></div>`}).join("")}
+ <button class="pri full" style="margin-top:10px" onclick="lFinish()">Finish lightning</button></div>`}
+// ---- score adjust (either team, with note; Undo removes it)
+function vAdj(){return adjOpen?`<div class="card"><h2>Adjust score</h2><div class="row"><select id="adjTeam" class="gradeSel"><option value="us">Us</option><option value="them">Opponent</option></select><input id="adjPts" type="number" inputmode="numeric" placeholder="+/- points" style="flex:0 0 120px"></div><div style="height:8px"></div><input id="adjNote" placeholder="Note (why)"><div class="row" style="margin-top:8px"><button class="pri" onclick="applyAdj()">Apply</button><button onclick="adjOpen=false;render()">Cancel</button></div></div>`:""}
+function applyAdj(){const n=parseInt($("#adjPts").value,10);if(!n)return alert("Enter points, e.g. 2 or -1.");const m=M();const us=$("#adjTeam").value==="us";
+ m.events.push({round:m.round,q:0,code:"adj",cat:null,pid:null,res:null,us:us?n:0,them:us?0:n,note:$("#adjNote").value.trim()});adjOpen=false;save();render()}
 function vLive(m){if(m.q>15&&(!m.lightLineups?.[m.round-1]||m.lightEdit))return vLightPick(m);const t=totals(m);const lightning=m.q>15;const lu=lightning?m.lightLineups[m.round-1]:m.lineups[m.round-1];
  return `<div class="score"><div>Us<b>${t.us}</b></div><div>${esc(m.opp)}<b>${t.them}</b></div></div>
- <div class="qbar">Round ${m.round} of 2 · Q${m.q} of 20 · ${lightning?"⚡ Lightning (2 pts)":"Toss-up (2 pts / steal 1)"}</div>
- ${lightning?`<div class="card"><div class="small">Lightning is team-only. In (${lu.length}): ${lu.map(id=>esc(nm(id))).join(", ")} <a href="#" onclick="M().lightEdit=true;render();return false">change</a> · Correct so far: <b>${m.events.filter(e=>e.round===m.round&&e.q>15&&e.code==="lC").length}/${m.q-16}</b></div></div>`:`<div class="card"><div class="small" style="margin-bottom:6px">Who buzzed? (tap first for our answers; optional on steals)</div><div class="chips">${lu.map(id=>`<button class="chip ${sel===id?"on":""}" onclick="sel=sel==='${id}'?null:'${id}';render()">${esc(nm(id))}</button>`).join("")}</div></div>`}
- ${lightning?"":`<div class="card"><div class="small" style="margin-bottom:6px">Category (optional)</div><div class="cats">${CATS.map(c=>`<button class="${cat===c?"on":""}" onclick="cat=cat==='${c}'?null:'${c}';render()">${c}</button>`).join("")}</div></div>`}<div class="grid2">${(lightning?LIGHT:TOSS).map(x=>`<button class="${x[2]}" style="min-height:70px" onclick="record('${x[0]}')">${x[1]}</button>`).join("")}</div>
- <div class="row" style="margin-top:12px"><button onclick="undo()">↶ Undo last</button><button class="mut" onclick="if(confirm('End this match now?')){M().done=true;M().stage='done';save();tab='stats';render()}">End match</button></div>
- <div class="card" style="margin-top:12px"><div class="log">${m.events.slice().reverse().map(e=>`R${e.round} Q${e.q}: ${e.code}${e.pid?" – "+esc(nm(e.pid)):""} (+${e.us}/+${e.them})`).join("<br>")||"No questions yet."}</div></div>`}
+ <div class="qbar">Round ${m.round} of 2 · ${lightning?"⚡ Lightning Q16–20 (1 pt each)":`Q${m.q} of 20 · Toss-up (2 pts / steal 1)`}</div>
+ ${lightning?"":`<div class="card"><div class="small" style="margin-bottom:6px">Category (optional)</div><div class="cats">${CATS.map(c=>`<button class="${cat===c?"on":""}" onclick="cat=cat==='${c}'?null:'${c}';render()">${c}</button>`).join("")}</div></div>`}
+ ${lightning?vLightning(m,lu):vToss(m,lu)}
+ <div class="row" style="margin-top:12px"><button onclick="undo()">↶ Undo last</button><button onclick="adjOpen=!adjOpen;render()">± Adjust score</button><button class="mut" onclick="if(confirm('End this match now?')){M().done=true;M().stage='done';save();tab='stats';render()}">End match</button></div>
+ ${vAdj()}<div class="card" style="margin-top:12px"><div class="log">${m.events.slice().reverse().map(e=>e.code==="adj"?`R${e.round} ± adjust: us ${e.us>=0?"+":""}${e.us} / opp ${e.them>=0?"+":""}${e.them}${e.note?" – "+esc(e.note):""}`:`R${e.round} Q${e.q}: ${CODE_LABEL[e.code]||e.code}${e.cat?" ["+esc(normCat(e.cat))+"]":""}${e.pid?" – "+esc(nm(e.pid)):""} (+${e.us}/+${e.them})`).join("<br>")||"No questions yet."}</div></div>`}
 function suggestion(m){const ms=pstats(m.events.filter(e=>e.round===1)),ss=seasonStats(m.id);
  // a player who has not answered yet this match counts as season accuracy (or 50%), not 0%
  // Each wrong buzz costs 1 point in the ranking (penalizes a high wrong-buzz rate); ties by accuracy, then season.
@@ -155,18 +205,53 @@ function suggestion(m){const ms=pstats(m.events.filter(e=>e.round===1)),ss=seaso
  return [...m.travel].sort((a,b)=>{const x=sc(a),y=sc(b);for(let i=0;i<6;i++)if(x[i]!==y[i])return y[i]-x[i];return 0}).slice(0,4)}
 function vSub(m){const cpl=catStats(teamMatches().flatMap(x=>x.events)).pl,ms=pstats(m.events.filter(e=>e.round===1)),ss=seasonStats(m.id),sug=suggestion(m);subPick??=[...m.lineups[0]];const t=totals(m);
  return `<div class="score"><div>Us<b>${t.us}</b></div><div>${esc(m.opp)}<b>${t.them}</b></div></div>
- <div class="card" style="margin-top:12px"><h2>Between rounds – subs</h2><p class="small">Suggested 4 ranked by Round 1 points minus wrong buzzes, then grade (higher first), then accuracy, then season, then category record (★ = best categories this season). Lightning R1: <b>${lightningRounds([m]).find(x=>x.round===1)?.correct??"–"}/5</b> (team). Tap rows to choose Round 2 players.</p>
- <table><tr><th>Player</th><th>✓</th><th>Wrong buzzes</th><th>Pts</th><th>Acc</th><th>Season</th><th></th></tr>
+ <div class="card" style="margin-top:12px"><h2>Between rounds – subs</h2><p class="small">Suggested 4 ranked by Round 1 points minus wrong buzzes, then grade (higher first), then accuracy, then season, then category record (★ = best categories this season). Lightning R1: <b>${lightningRounds([m]).find(x=>x.round===1)?.correct??"–"}/5</b> (team). </p><p style="margin:6px 0 10px;font-weight:700">Tap any player to put them in or out. IN/OUT tags are only hints – you choose the 4.</p>
+ <table><tr><th>Player</th><th>✓</th><th>Wrong buzzes</th><th>Pts</th><th>Acc</th><th>Season</th><th>Hint</th></tr>
  ${m.travel.map(id=>{const s=ms[id]||{c:0,w:0,pts:0},se=ss[id];const on=subPick.includes(id),was=m.lineups[0].includes(id);return `<tr onclick="tgSub('${id}')" style="background:${on?"#e3eeff":""}"><td><b>${on?"☑":"☐"} ${esc(nm(id))}</b>${was?' <span class="small">(R1)</span>':""}${bestCats(cpl[id]).length?`<div class="small">★ ${bestCats(cpl[id]).join(", ")}</div>`:""}</td><td>${s.c}</td><td>${s.w}${s.c+s.w?` <span class="small">(${Math.round(buzzRate(s)*100)}%)</span>`:""}</td><td>${s.pts}</td><td>${acc(s)??"–"}${acc(s)!=null?"%":""}</td><td class="small">${se?se.pts+"p "+(acc(se)??"–")+"% "+se.w+"✗":"–"}</td><td>${sug.includes(id)?'<span class="tag tin">IN</span>':'<span class="tag tout">OUT</span>'}</td></tr>`}).join("")}</table>
  <div class="row" style="margin-top:12px"><button onclick="subPick=[...suggestion(M())];render()">Use suggestion</button><button onclick="subPick=[...M().lineups[0]];render()">Keep same 4</button></div></div>
  <button class="pri full" onclick="startR2()">Start Round 2 (${subPick.length}/4)</button><div style="height:8px"></div><button class="full" onclick="undo()">↶ Undo last question</button>`}
-function tgSub(id){const i=subPick.indexOf(id);if(i>=0)subPick.splice(i,1);else if(subPick.length<4)subPick.push(id);render()}
+function tgSub(id){const i=subPick.indexOf(id);if(i>=0)subPick.splice(i,1);else if(subPick.length<4)subPick.push(id);else return alert("4 players are already in. Tap someone to take them out first.");render()}
 function startR2(){if(subPick.length!==4)return alert("Pick 4 players.");const m=M();m.lineups[1]=[...subPick];m.round=2;m.q=1;m.stage="live";subPick=null;save();render()}
 function statTable(st){const ids=Object.keys(st).sort((a,b)=>st[b].pts-st[a].pts);return ids.length?`<table><tr><th>Player</th><th>✓</th><th>Wrong buzzes</th><th>Pts</th><th>Acc</th></tr>${ids.map(id=>`<tr><td>${esc(nm(id))}</td><td>${st[id].c}</td><td>${st[id].w}</td><td>${st[id].pts}</td><td>${acc(st[id])??"–"}%</td></tr>`).join("")}</table>`:'<p class="small">No player answers yet.</p>'}
 function lightningTable(){const lr=lightningRounds(teamMatches()),by=lightningByPlayer(lr),all=lr.length?lr.reduce((a,x)=>a+x.correct,0)/lr.length:null;const ids=Object.keys(by).sort((a,b)=>by[b].sum/by[b].n-by[a].sum/by[a].n);
  return `<div class="card"><h2>Lightning lineups</h2><p class="small">Average lightning correct (out of 5) in rounds each player was in. Team average: ${all==null?"–":all.toFixed(1)} over ${lr.length} round${lr.length===1?"":"s"}.</p>${ids.length?`<table><tr><th>Player</th><th>Rounds in</th><th>Avg /5</th></tr>${ids.map(id=>`<tr><td>${esc(nm(id))}</td><td>${by[id].n}</td><td><b>${(by[id].sum/by[id].n).toFixed(1)}</b></td></tr>`).join("")}</table>`:'<p class="small">No complete lightning rounds yet.</p>'}</div>`}
 function vStats(){return `<div class="card"><h2>${TEAMS[S.team]} season totals (toss-ups &amp; steals)</h2>${statTable(pstats(teamMatches().flatMap(m=>m.events)))}</div>`+`<div class="card"><h2>Categories – season</h2>${catTable(teamMatches().flatMap(m=>m.events))}</div>`+lightningTable()+attTable()+
- teamMatches().slice().reverse().map(m=>{const t=totals(m);return `<div class="card"><h2>vs ${esc(m.opp)} <span class="small">${esc(m.date)} · ${m.done?"final":"in progress"}</span></h2><div class="qbar">${t.us} – ${t.them}</div><p class="small">${lightningRounds([m]).map(x=>`Lightning R${x.round}: <b>${x.correct}/5</b> (${x.players.map(id=>esc(nm(id))).join(", ")})`).join("<br>")||"No complete lightning rounds."}</p>${statTable(pstats(m.events))}<details style="margin-top:8px"><summary class="small">Categories this match</summary>${catTable(m.events)}</details><details style="margin-top:8px"><summary class="small">Attendance (${teamRoster().filter(p=>attOf(m,p.id)==="P").length} present) – tap to edit</summary>${teamRoster().map(p=>`<div class="li"><span>${esc(p.name)}${m.travel.includes(p.id)?' <span class="small">(in room)</span>':""}</span>${attBtns(attOf(m,p.id),`setMatchAtt('${m.id}','${p.id}',X)`)}</div>`).join("")}</details><button class="bad" style="min-height:40px;margin-top:8px;font-size:14px" onclick="delMatch('${m.id}')">Delete match</button></div>`}).join("")}
+ teamMatches().slice().reverse().map(m=>{const t=totals(m);return `<div class="card"><h2>vs ${esc(m.opp)} <span class="small">${esc(m.date)} · ${m.past?"entered after":m.done?"final":"in progress"}</span></h2>${m.past?`<button style="min-height:40px;font-size:14px;margin-bottom:6px" onclick="openPast('${m.id}')">✎ Edit match</button>`:""}<div class="qbar">${t.us} – ${t.them}</div><p class="small">${lightningRounds([m]).map(x=>`Lightning R${x.round}: <b>${x.correct}/5</b> (${x.players.map(id=>esc(nm(id))).join(", ")})`).join("<br>")||"No complete lightning rounds."}</p>${statTable(pstats(m.events))}<details style="margin-top:8px"><summary class="small">Categories this match</summary>${catTable(m.events)}</details><details style="margin-top:8px"><summary class="small">Attendance (${teamRoster().filter(p=>attOf(m,p.id)==="P").length} present) – tap to edit</summary>${teamRoster().map(p=>`<div class="li"><span>${esc(p.name)}${m.travel.includes(p.id)?' <span class="small">(in room)</span>':""}</span>${attBtns(attOf(m,p.id),`setMatchAtt('${m.id}','${p.id}',X)`)}</div>`).join("")}</details><button class="bad" style="min-height:40px;margin-top:8px;font-size:14px" onclick="delMatch('${m.id}')">Delete match</button></div>`}).join("")}
+// ---- past match entry. The form (m.pastForm) is kept so the match can be edited; events are rebuilt from it on save:
+// per player/round correct (usC +2) and wrong buzzes (usW), optional categories, lightning x/5, plus one score
+// adjustment so the totals equal the final scores entered.
+const blankPast=()=>({team:S.team,opp:"",date:new Date().toLocaleDateString("en-CA"),us:"",them:"",att:{},r:[[],[]],st:{},light:["",""]});
+function openPast(id){const m=id&&S.matches.find(x=>x.id===id);pf=m?JSON.parse(JSON.stringify(m.pastForm)):blankPast();pf.id=m?m.id:null;tab="match";render();scrollTo(0,0)}
+const pfRoster=()=>S.roster.filter(p=>p.team===pf.team);
+const pst=(r,id)=>pf.st[r+"|"+id]??={c:0,w:0,cats:{}};
+function pfNum(v){v=parseInt(v,10);return isNaN(v)||v<0?0:v}
+function pfTeam(t){pf.team=t;pf.att={};pf.r=[[],[]];pf.st={};render()}
+function pfAtt(id,v){pf.att[id]=v;if(v==="A")pf.r=pf.r.map(a=>a.filter(x=>x!==id));render()}
+function pfPlay(r,id){const a=pf.r[r];const i=a.indexOf(id);if(i>=0)a.splice(i,1);else if(a.length<4)a.push(id);else return alert("4 players already picked for this round. Tap one to remove first.");render()}
+function stepper(val,on){return `<span class="step"><button onclick="${on}(-1)">−</button><input type="number" inputmode="numeric" min="0" value="${val}" onchange="${on}(0,this.value)"><button onclick="${on}(1)">+</button></span>`}
+function pfAdj(r,id,k,d,v){const x=pst(r,id);x[k]=d?Math.max(0,x[k]+d):pfNum(v);render()}
+function pfCat(r,id,c,k,d,v){const x=pst(r,id);const y=x.cats[c]??={c:0,w:0};y[k]=d?Math.max(0,y[k]+d):pfNum(v);const sc=Object.values(x.cats).reduce((a,z)=>a+z[k],0);if(x[k]<sc)x[k]=sc;render()}
+function vPast(){const ros=pfRoster(),present=ros.filter(p=>pf.att[p.id]!=="A");
+ const round=r=>`<div class="card"><h2>Round ${r+1} <span class="small">(${pf.r[r].length}/4 played)</span></h2><p class="small">Tap who played this round.</p><div class="chips">${present.map(p=>`<button class="chip ${pf.r[r].includes(p.id)?"on":""}" onclick="pfPlay(${r},'${p.id}')">${esc(p.name)}</button>`).join("")||'<p class="small">No one marked present.</p>'}</div>
+  ${pf.r[r].length?`<p class="small" style="margin-top:12px">Correct answers and wrong buzzes (toss-ups &amp; steals):</p>${pf.r[r].map(id=>{const x=pst(r,id);return `<div class="li" style="flex-wrap:wrap"><span><b>${esc(nm(id))}</b></span><span class="small" style="flex:0">✓</span>${stepper(x.c,`((d,v)=>pfAdj(${r},'${id}','c',d,v))`)}<span class="small" style="flex:0">✗</span>${stepper(x.w,`((d,v)=>pfAdj(${r},'${id}','w',d,v))`)}
+   <details style="width:100%" ${pf.openCat===r+"|"+id?"open":""} ontoggle="if(this.open)pf.openCat='${r}|${id}';else if(pf.openCat==='${r}|${id}')pf.openCat=null"><summary class="small">By category (optional)</summary>${CATS.map(c=>{const y=x.cats[c]||{c:0,w:0};return `<div class="li"><span class="small">${c}</span><span class="small" style="flex:0">✓</span>${stepper(y.c,`((d,v)=>pfCat(${r},'${id}','${c}','c',d,v))`)}<span class="small" style="flex:0">✗</span>${stepper(y.w,`((d,v)=>pfCat(${r},'${id}','${c}','w',d,v))`)}</div>`}).join("")}</details></div>`}).join("")}`:""}
+  <div class="li"><span><b>⚡ Lightning correct</b> <span class="small">(out of 5)</span></span><select class="gradeSel" onchange="pf.light[${r}]=this.value"><option value="">–</option>${[0,1,2,3,4,5].map(n=>`<option ${String(pf.light[r])===String(n)?"selected":""}>${n}</option>`).join("")}</select></div></div>`;
+ return `<div class="card"><h2>${pf.id?"Edit past match":"Add a past match"}</h2>
+ <div class="row" style="margin-bottom:8px">${Object.entries(TEAMS).map(([k,l])=>`<button class="${pf.team===k?"pri":""}" onclick="pfTeam('${k}')">${l}</button>`).join("")}</div>
+ <input id="pfOpp" placeholder="Opponent" value="${esc(pf.opp)}" oninput="pf.opp=this.value"><div style="height:8px"></div><input type="date" value="${esc(pf.date)}" oninput="pf.date=this.value">
+ <p class="small" style="margin:12px 0 4px">Final score</p><div class="row"><label class="small">Us<input id="pfUs" type="number" inputmode="numeric" value="${esc(pf.us)}" oninput="pf.us=this.value"></label><label class="small">Opponent<input id="pfThem" type="number" inputmode="numeric" value="${esc(pf.them)}" oninput="pf.them=this.value"></label></div></div>
+ <div class="card"><h2>Attendance <span class="small">(${present.length} present)</span></h2>${ros.map(p=>`<div class="li"><span>${esc(p.name)}</span>${attBtns(pf.att[p.id]||"P",`pfAtt('${p.id}',X)`)}</div>`).join("")||'<p class="small">This team has no students yet.</p>'}</div>
+ ${round(0)}${round(1)}
+ <div class="row"><button class="pri" onclick="savePast()">Save match</button><button onclick="pf=null;render()">Cancel</button></div>`}
+function savePast(){if(!pf.opp.trim())return alert("Enter the opponent.");if(pf.us===""||pf.them==="")return alert("Enter both final scores.");
+ const ev=[];[0,1].forEach(r=>{pf.r[r].forEach(id=>{const x=pst(r,id);["c","w"].forEach(k=>{let left=x[k];CATS.forEach(c=>{for(let i=0;i<(x.cats[c]?.[k]||0);i++,left--)ev.push({round:r+1,q:1,code:k==="c"?"usC":"usW",cat:c,pid:id,res:k,us:k==="c"?2:0,them:0})});for(;left>0;left--)ev.push({round:r+1,q:1,code:k==="c"?"usC":"usW",cat:null,pid:id,res:k,us:k==="c"?2:0,them:0})})});
+  if(pf.light[r]!==""&&pf.light[r]!=null){const n=+pf.light[r];for(let q=16;q<=20;q++)ev.push({round:r+1,q,code:q-16<n?"lC":"lW",cat:null,pid:null,res:null,us:q-16<n?1:0,them:0})}});
+ const su=ev.reduce((a,e)=>a+e.us,0),us=parseInt(pf.us,10)||0,them=parseInt(pf.them,10)||0;
+ ev.push({round:2,q:0,code:"adj",cat:null,pid:null,res:null,us:us-su,them,note:"Final score (entered after the match)"});
+ const travel=[...new Set([...pf.r[0],...pf.r[1]])],attendance={};pfRoster().forEach(p=>attendance[p.id]=pf.att[p.id]||"P");
+ const form=JSON.parse(JSON.stringify(pf));delete form.id;
+ const m={id:pf.id||uid(),team:pf.team,opp:pf.opp.trim(),date:pf.date,attendance,travel,lineups:[[...pf.r[0]],[...pf.r[1]]],lightLineups:[travel,travel],round:2,q:21,stage:"done",done:true,past:true,events:ev,pastForm:form};
+ const i=S.matches.findIndex(x=>x.id===m.id);if(i>=0)S.matches[i]=m;else S.matches.push(m);S.team=m.team;pf=null;tab="stats";save();render()}
 function delMatch(id){if(confirm("Delete this match and its stats?")){S.matches=S.matches.filter(m=>m.id!==id);Object.keys(S.curBy).forEach(k=>{if(S.curBy[k]===id)S.curBy[k]=null});save();render()}}
 function exp(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:"application/json"}));a.download=`league-coach-backup-${new Date().toLocaleDateString("en-CA")}.json`;a.click()}
 function imp(inp){const f=inp.files[0];if(!f)return;f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.roster)||!Array.isArray(d.matches))throw 0;if(confirm(`Replace everything with this backup (${d.roster.length} students, ${d.matches.length} matches)?`)){S=d;S.team??="V";S.curBy??={V:S.cur||null,JV:null};delete S.cur;S.roster.forEach(p=>p.team??="V");S.matches.forEach(m=>m.team??="V");save();render()}}catch{alert("That file isn't a League Coach backup.")}inp.value=""})}
