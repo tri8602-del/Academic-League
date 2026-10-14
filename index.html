@@ -69,7 +69,10 @@ const nm=id=>(S.roster.find(p=>p.id===id)||{name:"(removed)"}).name;
 const M=()=>S.matches.find(m=>m.id===S.curBy[S.team]);
 const $=s=>document.querySelector(s);
 // ---- scoring ----
-function totals(m){let us=0,them=0;m.events.forEach(e=>{us+=e.us;them+=e.them});return{us,them}}
+// Lightning counts 2 per correct, also for questions saved at 1 point in v2 (saved data is not rewritten).
+const evUs=e=>e.q>15&&e.code!=="adj"?(e.code==="lC"?2:0):e.us;
+// A match entered after the fact shows the final scores she typed in.
+function totals(m){if(m.past&&m.pastForm)return{us:parseInt(m.pastForm.us,10)||0,them:parseInt(m.pastForm.them,10)||0};let us=0,them=0;m.events.forEach(e=>{us+=evUs(e);them+=e.them});return{us,them}}
 function pstats(events){const o={};const g=id=>o[id]??={c:0,w:0,pts:0};
   events.forEach(e=>{if(!e.pid||e.q>15)return;const s=g(e.pid);if(e.res==="c"){s.c++;s.pts+=e.us}else if(e.res==="w")s.w++;});return o}
 const buzzRate=s=>s&&s.c+s.w?s.w/(s.c+s.w):0;
@@ -97,7 +100,7 @@ const TOSS=[
  ["oppW","Opp wrong, no steal","opp",{}],
  ["none","No answer","mut",{}]];
 // Lightning is team-only: no player credit, counted per round as x/5 with that round's 4 players.
-const LIGHT=[["lC","✓ Correct  +1","ok",{us:1}],["lW","✗ Wrong / no answer","bad",{}]];
+const LIGHT=[["lC","✓ Correct  +2","ok",{us:2}],["lW","✗ Wrong / no answer","bad",{}]];
 function record(code){const m=M();const lightning=m.q>15;const o=(lightning?LIGHT:TOSS).find(x=>x[0]===code)[3];
   if(o.need&&!sel){alert("Tap the player who answered first.");return}
   m.events.push({round:m.round,q:m.q,code,cat:lightning?null:cat,pid:o.res&&!lightning?sel:null,res:o.res||null,us:o.us||0,them:o.them||0});
@@ -154,15 +157,16 @@ function setLight(){if(!lightPick.length)return alert("Pick at least one player.
 // Each path ends in one of the TOSS outcome codes, so stats and older matches work the same.
 function tfSet(k,v){tf[k]=v;tf.step++;
  if(k==="buzz"&&v==="no")return record("none");
+ if(k==="buzz"){tf.step=1;return render()}
  if(k==="res"&&v==="c")return record(tf.who==="us"?"usC":"oppC");
  if(k==="steal"&&v==="no")return record(tf.who==="us"?"usW":"oppW");
  render()}
-function tfBack(){const order=["buzz","who","pid","res","steal"];tf.step=Math.max(0,tf.step-1);if(tf.step===2&&tf.who!=="us")tf.step=1;const k=order[tf.step];delete tf[k];if(k==="pid")sel=null;render()}
+function tfBack(){if(tf.step<=3){if(tf.step<=1)tf={step:0};else{tf={step:1,buzz:"yes"}};sel=null;return render()}tf.step--;delete tf[tf.step===3?"res":"steal"];render()}
 function stealResult(ok){const us=tf.who==="us";record(us?(ok?"usWoppS":"usW"):(ok?"oppWusS":"oppWusW"))}
-function vToss(m,lu){const big='style="min-height:84px;font-size:20px"';const crumbs=[tf.buzz&&"Buzz",tf.who&&(tf.who==="us"?"Our kid":"Opponent"),sel&&tf.who==="us"&&esc(nm(sel)),tf.res&&(tf.res==="c"?"Correct":"Incorrect"),tf.steal&&"Steal"].filter(Boolean).join(" → ");
+function vToss(m,lu){const big='style="min-height:84px;font-size:20px"';const crumbs=[tf.buzz&&"Buzz",tf.who==="opp"&&"Other team",tf.who==="us"&&sel&&esc(nm(tf.pid||sel)),tf.res&&(tf.res==="c"?"Correct":"Incorrect"),tf.steal&&"Steal"].filter(Boolean).join(" → ");
  let body;
  if(tf.step===0)body=`<div class="grid2"><button class="pri" ${big} onclick="tfSet('buzz','yes')">🔔 Buzz</button><button class="mut" ${big} onclick="tfSet('buzz','no')">No buzz</button></div>`;
- else if(tf.step===1)body=`<div class="grid2"><button class="ok" ${big} onclick="tf.who='us';tf.step=2;render()">Our kid</button><button class="opp" ${big} onclick="tf.who='opp';tf.step=3;render()">Opponent</button></div>`;
+ else if(tf.step===1)body=`<div class="small" style="margin-bottom:6px">Who buzzed?</div><div class="chips">${lu.map(id=>`<button class="chip" style="min-height:72px;font-size:19px" onclick="sel='${id}';tf.who='us';tf.pid='${id}';tf.step=3;render()">${esc(nm(id))}</button>`).join("")}</div><button class="opp full" style="min-height:72px;font-size:19px;margin-top:8px" onclick="sel=null;tf.who='opp';tf.step=3;render()">Other team</button>`;
  else if(tf.step===2)body=`<div class="small" style="margin-bottom:6px">Which player buzzed?</div><div class="chips">${lu.map(id=>`<button class="chip" style="min-height:64px" onclick="sel='${id}';tf.pid='${id}';tf.step=3;render()">${esc(nm(id))}</button>`).join("")}</div>`;
  else if(tf.step===3)body=`<div class="grid2"><button class="ok" ${big} onclick="tfSet('res','c')">✓ Correct${tf.who==="us"?" +2":" +2 opp"}</button><button class="bad" ${big} onclick="tfSet('res','w')">✗ Incorrect</button></div>`;
  else if(tf.step===4)body=`<div class="small" style="margin-bottom:6px">${tf.who==="us"?"Does the opponent steal?":"Do we steal?"}</div><div class="grid2"><button class="${tf.who==="us"?"opp":"ok"}" ${big} onclick="tfSet('steal','yes')">Steal</button><button class="mut" ${big} onclick="tfSet('steal','no')">No steal</button></div>`;
@@ -173,14 +177,14 @@ function lEv(m,q){return m.events.find(e=>e.round===m.round&&e.q===q&&e.code!=="
 function lState(m,q){return m.lstate?.[m.round]?.[q]}
 function lSet(q,v){const m=M();m.lstate??={};(m.lstate[m.round]??={})[q]=v;save();render()}
 function lMark(q,ok){const m=M();const e=lEv(m,q);const code=ok?"lC":"lW";
- if(e){e.code=code;e.us=ok?1:0}else m.events.push({round:m.round,q,code,cat:null,pid:null,res:null,us:ok?1:0,them:0});
+ if(e){e.code=code;e.us=ok?2:0}else m.events.push({round:m.round,q,code,cat:null,pid:null,res:null,us:ok?2:0,them:0});
  lSet(q,"done")}
 function lFinish(){const m=M();const open=[16,17,18,19,20].filter(q=>!lEv(m,q));
  if(open.length&&!confirm(`${open.length} question${open.length>1?"s are":" is"} not marked. Count ${open.length>1?"them":"it"} as incorrect and finish lightning?`))return;
  open.forEach(q=>m.events.push({round:m.round,q,code:"lW",cat:null,pid:null,res:null,us:0,them:0}));
  m.q=21;if(m.round===1)m.stage="sub";else{m.stage="done";m.done=true}save();render()}
 function vLightning(m,lu){const qs=[16,17,18,19,20];const ev=qs.map(q=>lEv(m,q));const c=ev.filter(e=>e?.code==="lC").length,w=ev.filter(e=>e?.code==="lW").length;
- return `<div class="card"><div class="small">Lightning is team-only, 1 point each. In (${lu.length}): ${lu.map(id=>esc(nm(id))).join(", ")} <a href="#" onclick="M().lightEdit=true;render();return false">change</a></div>
+ return `<div class="card"><div class="small">Lightning is team-only, 2 points each. In (${lu.length}): ${lu.map(id=>esc(nm(id))).join(", ")} <a href="#" onclick="M().lightEdit=true;render();return false">change</a></div>
  <div class="qbar" style="margin:8px 0 4px">✓ ${c} correct · ✗ ${w} incorrect · ${5-c-w} open</div>
  ${qs.map((q,i)=>{const e=ev[i],st=lState(m,q);const label=e?(e.code==="lC"?'<span class="tag tin">✓ Correct</span>':'<span class="tag tout">✗ Incorrect</span>'):st==="pass"?'<span class="tag" style="background:#fff3d6;color:#8a5a00">Passed</span>':st==="ans"?'<span class="tag" style="background:#e3eeff;color:#1f3a5f">Answered</span>':"";
   return `<div class="lrow"><b>Q${q-15}</b><span>${label}</span><button class="${st==="ans"?"pri":""}" onclick="lSet(${q},'ans')">Answer</button><button onclick="lSet(${q},'pass')">Pass</button><button class="ok" onclick="lMark(${q},true)">✓</button><button class="bad" onclick="lMark(${q},false)">✗</button></div>`}).join("")}
@@ -191,32 +195,35 @@ function applyAdj(){const n=parseInt($("#adjPts").value,10);if(!n)return alert("
  m.events.push({round:m.round,q:0,code:"adj",cat:null,pid:null,res:null,us:us?n:0,them:us?0:n,note:$("#adjNote").value.trim()});adjOpen=false;save();render()}
 function vLive(m){if(m.q>15&&(!m.lightLineups?.[m.round-1]||m.lightEdit))return vLightPick(m);const t=totals(m);const lightning=m.q>15;const lu=lightning?m.lightLineups[m.round-1]:m.lineups[m.round-1];
  return `<div class="score"><div>Us<b>${t.us}</b></div><div>${esc(m.opp)}<b>${t.them}</b></div></div>
- <div class="qbar">Round ${m.round} of 2 · ${lightning?"⚡ Lightning Q16–20 (1 pt each)":`Q${m.q} of 20 · Toss-up (2 pts / steal 1)`}</div>
+ <div class="qbar">Round ${m.round} of 2 · ${lightning?"⚡ Lightning Q16–20 (2 pts each)":`Q${m.q} of 20 · Toss-up (2 pts / steal 1)`}</div>
  ${lightning?"":`<div class="card"><div class="small" style="margin-bottom:6px">Category (optional)</div><div class="cats">${CATS.map(c=>`<button class="${cat===c?"on":""}" onclick="cat=cat==='${c}'?null:'${c}';render()">${c}</button>`).join("")}</div></div>`}
  ${lightning?vLightning(m,lu):vToss(m,lu)}
  <div class="row" style="margin-top:12px"><button onclick="undo()">↶ Undo last</button><button onclick="adjOpen=!adjOpen;render()">± Adjust score</button><button class="mut" onclick="if(confirm('End this match now?')){M().done=true;M().stage='done';save();tab='stats';render()}">End match</button></div>
  ${vAdj()}<div class="card" style="margin-top:12px"><div class="log">${m.events.slice().reverse().map(e=>e.code==="adj"?`R${e.round} ± adjust: us ${e.us>=0?"+":""}${e.us} / opp ${e.them>=0?"+":""}${e.them}${e.note?" – "+esc(e.note):""}`:`R${e.round} Q${e.q}: ${CODE_LABEL[e.code]||e.code}${e.cat?" ["+esc(normCat(e.cat))+"]":""}${e.pid?" – "+esc(nm(e.pid)):""} (+${e.us}/+${e.them})`).join("<br>")||"No questions yet."}</div></div>`}
-function suggestion(m){const ms=pstats(m.events.filter(e=>e.round===1)),ss=seasonStats(m.id);
- // a player who has not answered yet this match counts as season accuracy (or 50%), not 0%
- // Each wrong buzz costs 1 point in the ranking (penalizes a high wrong-buzz rate); ties by accuracy, then season.
- const cs=catStats(teamMatches().flatMap(x=>x.events)).pl,catScore=id=>Object.values(cs[id]||{}).reduce((a,v)=>a+v.c-v.w,0);
- // Ties on points-minus-wrong-buzzes go to the higher grade first, then the other tiebreakers.
- const sc=id=>[(ms[id]?.pts||0)-(ms[id]?.w||0),gradeOf(id),acc(ms[id])??acc(ss[id])??50,(ss[id]?.pts||0)-(ss[id]?.w||0),acc(ss[id])??-1,catScore(id)];
- return [...m.travel].sort((a,b)=>{const x=sc(a),y=sc(b);for(let i=0;i<6;i++)if(x[i]!==y[i])return y[i]-x[i];return 0}).slice(0,4)}
-function vSub(m){const cpl=catStats(teamMatches().flatMap(x=>x.events)).pl,ms=pstats(m.events.filter(e=>e.round===1)),ss=seasonStats(m.id),sug=suggestion(m);subPick??=[...m.lineups[0]];const t=totals(m);
+// Rounds a player actually played (each match has 2; round 2 only once it has a lineup).
+function roundsPlayed(ms){const o={};ms.forEach(m=>[0,1].forEach(r=>{if(r===1&&!(m.round===2||m.done))return;(m.lineups?.[r]||[]).forEach(id=>o[id]=(o[id]||0)+1)}));return o}
+function avgPerRound(ms){const st=pstats(ms.flatMap(m=>m.events)),rp=roundsPlayed(ms),o={};Object.keys(rp).forEach(id=>o[id]=(st[id]?.pts||0)/rp[id]);return o}
+const RANK_TEXT="Ranking: most points earned first; ties go to points minus wrong buzzes, then more buzzes (only for players right at least half the time), then accuracy, then season avg points per round, then higher grade.";
+// Sort key (higher is better). acc falls back to season accuracy, then 50%, for a player who hasn't buzzed yet.
+function rankKey(s,season,avg,id){s=s||{c:0,w:0,pts:0};const a=acc(s)??acc(season)??50;return [s.pts,s.pts-s.w,a>=50?s.c+s.w:0,a,avg??-1,gradeOf(id)]}
+function rankSort(ids,keyOf){const K=Object.fromEntries(ids.map(id=>[id,keyOf(id)]));return [...ids].sort((a,b)=>{const x=K[a],y=K[b];for(let i=0;i<x.length;i++)if(x[i]!==y[i])return y[i]-x[i];return 0})}
+function suggestion(m){const ms0=pstats(m.events.filter(e=>e.round===1)),ss0=seasonStats(m.id),av=avgPerRound(teamMatches().filter(x=>x.id!==m.id));
+ return rankSort(m.travel,id=>rankKey(ms0[id],ss0[id],av[id],id)).slice(0,4)}
+function vSub(m){const cpl=catStats(teamMatches().flatMap(x=>x.events)).pl,ms=pstats(m.events.filter(e=>e.round===1)),ss=seasonStats(m.id),avS=avgPerRound(teamMatches().filter(x=>x.id!==m.id)),sug=suggestion(m);subPick??=[...m.lineups[0]];const t=totals(m);
  return `<div class="score"><div>Us<b>${t.us}</b></div><div>${esc(m.opp)}<b>${t.them}</b></div></div>
- <div class="card" style="margin-top:12px"><h2>Between rounds – subs</h2><p class="small">Suggested 4 ranked by Round 1 points minus wrong buzzes, then grade (higher first), then accuracy, then season, then category record (★ = best categories this season). Lightning R1: <b>${lightningRounds([m]).find(x=>x.round===1)?.correct??"–"}/5</b> (team). </p><p style="margin:6px 0 10px;font-weight:700">Tap any player to put them in or out. IN/OUT tags are only hints – you choose the 4.</p>
- <table><tr><th>Player</th><th>✓</th><th>Wrong buzzes</th><th>Pts</th><th>Acc</th><th>Season</th><th>Hint</th></tr>
- ${m.travel.map(id=>{const s=ms[id]||{c:0,w:0,pts:0},se=ss[id];const on=subPick.includes(id),was=m.lineups[0].includes(id);return `<tr onclick="tgSub('${id}')" style="background:${on?"#e3eeff":""}"><td><b>${on?"☑":"☐"} ${esc(nm(id))}</b>${was?' <span class="small">(R1)</span>':""}${bestCats(cpl[id]).length?`<div class="small">★ ${bestCats(cpl[id]).join(", ")}</div>`:""}</td><td>${s.c}</td><td>${s.w}${s.c+s.w?` <span class="small">(${Math.round(buzzRate(s)*100)}%)</span>`:""}</td><td>${s.pts}</td><td>${acc(s)??"–"}${acc(s)!=null?"%":""}</td><td class="small">${se?se.pts+"p "+(acc(se)??"–")+"% "+se.w+"✗":"–"}</td><td>${sug.includes(id)?'<span class="tag tin">IN</span>':'<span class="tag tout">OUT</span>'}</td></tr>`}).join("")}</table>
+ <div class="card" style="margin-top:12px"><h2>Between rounds – subs</h2><p class="small">Suggested 4 use Round 1 stats. ${RANK_TEXT} (★ = best categories this season.) Lightning R1: <b>${lightningRounds([m]).find(x=>x.round===1)?.correct??"–"}/5</b> (team). </p><p style="margin:6px 0 10px;font-weight:700">Tap any player to put them in or out. IN/OUT tags are only hints – you choose the 4.</p>
+ <table><tr><th>Player</th><th>✓</th><th>Wrong buzzes</th><th>Pts</th><th>Acc</th><th>Avg/rd (season)</th><th>Hint</th></tr>
+ ${m.travel.map(id=>{const s=ms[id]||{c:0,w:0,pts:0},se=ss[id];const on=subPick.includes(id),was=m.lineups[0].includes(id);return `<tr onclick="tgSub('${id}')" style="background:${on?"#e3eeff":""}"><td><b>${on?"☑":"☐"} ${esc(nm(id))}</b>${was?' <span class="small">(R1)</span>':""}${bestCats(cpl[id]).length?`<div class="small">★ ${bestCats(cpl[id]).join(", ")}</div>`:""}</td><td>${s.c}</td><td>${s.w}${s.c+s.w?` <span class="small">(${Math.round(buzzRate(s)*100)}%)</span>`:""}</td><td>${s.pts}</td><td>${acc(s)??"–"}${acc(s)!=null?"%":""}</td><td class="small">${avS[id]!=null?avS[id].toFixed(1):"–"}</td><td>${sug.includes(id)?'<span class="tag tin">IN</span>':'<span class="tag tout">OUT</span>'}</td></tr>`}).join("")}</table>
  <div class="row" style="margin-top:12px"><button onclick="subPick=[...suggestion(M())];render()">Use suggestion</button><button onclick="subPick=[...M().lineups[0]];render()">Keep same 4</button></div></div>
  <button class="pri full" onclick="startR2()">Start Round 2 (${subPick.length}/4)</button><div style="height:8px"></div><button class="full" onclick="undo()">↶ Undo last question</button>`}
 function tgSub(id){const i=subPick.indexOf(id);if(i>=0)subPick.splice(i,1);else if(subPick.length<4)subPick.push(id);else return alert("4 players are already in. Tap someone to take them out first.");render()}
 function startR2(){if(subPick.length!==4)return alert("Pick 4 players.");const m=M();m.lineups[1]=[...subPick];m.round=2;m.q=1;m.stage="live";subPick=null;save();render()}
-function statTable(st){const ids=Object.keys(st).sort((a,b)=>st[b].pts-st[a].pts);return ids.length?`<table><tr><th>Player</th><th>✓</th><th>Wrong buzzes</th><th>Pts</th><th>Acc</th></tr>${ids.map(id=>`<tr><td>${esc(nm(id))}</td><td>${st[id].c}</td><td>${st[id].w}</td><td>${st[id].pts}</td><td>${acc(st[id])??"–"}%</td></tr>`).join("")}</table>`:'<p class="small">No player answers yet.</p>'}
+// Players listed best first (same ranking as the sub suggestion). Avg/rd = points / rounds played in these matches.
+function statTable(st,ms){const av=avgPerRound(ms||[]),rp=roundsPlayed(ms||[]);const ids=rankSort(Object.keys(st),id=>rankKey(st[id],null,av[id],id));return ids.length?`<table><tr><th>Player</th><th>✓</th><th>Wrong buzzes</th><th>Pts</th><th>Acc</th><th>Avg/rd</th></tr>${ids.map(id=>`<tr><td>${esc(nm(id))}</td><td>${st[id].c}</td><td>${st[id].w}</td><td>${st[id].pts}</td><td>${acc(st[id])??"–"}%</td><td>${av[id]!=null?av[id].toFixed(1):"–"}<span class="small"> (${rp[id]||0})</span></td></tr>`).join("")}</table>`:'<p class="small">No player answers yet.</p>'}
 function lightningTable(){const lr=lightningRounds(teamMatches()),by=lightningByPlayer(lr),all=lr.length?lr.reduce((a,x)=>a+x.correct,0)/lr.length:null;const ids=Object.keys(by).sort((a,b)=>by[b].sum/by[b].n-by[a].sum/by[a].n);
  return `<div class="card"><h2>Lightning lineups</h2><p class="small">Average lightning correct (out of 5) in rounds each player was in. Team average: ${all==null?"–":all.toFixed(1)} over ${lr.length} round${lr.length===1?"":"s"}.</p>${ids.length?`<table><tr><th>Player</th><th>Rounds in</th><th>Avg /5</th></tr>${ids.map(id=>`<tr><td>${esc(nm(id))}</td><td>${by[id].n}</td><td><b>${(by[id].sum/by[id].n).toFixed(1)}</b></td></tr>`).join("")}</table>`:'<p class="small">No complete lightning rounds yet.</p>'}</div>`}
-function vStats(){return `<div class="card"><h2>${TEAMS[S.team]} season totals (toss-ups &amp; steals)</h2>${statTable(pstats(teamMatches().flatMap(m=>m.events)))}</div>`+`<div class="card"><h2>Categories – season</h2>${catTable(teamMatches().flatMap(m=>m.events))}</div>`+lightningTable()+attTable()+
- teamMatches().slice().reverse().map(m=>{const t=totals(m);return `<div class="card"><h2>vs ${esc(m.opp)} <span class="small">${esc(m.date)} · ${m.past?"entered after":m.done?"final":"in progress"}</span></h2>${m.past?`<button style="min-height:40px;font-size:14px;margin-bottom:6px" onclick="openPast('${m.id}')">✎ Edit match</button>`:""}<div class="qbar">${t.us} – ${t.them}</div><p class="small">${lightningRounds([m]).map(x=>`Lightning R${x.round}: <b>${x.correct}/5</b> (${x.players.map(id=>esc(nm(id))).join(", ")})`).join("<br>")||"No complete lightning rounds."}</p>${statTable(pstats(m.events))}<details style="margin-top:8px"><summary class="small">Categories this match</summary>${catTable(m.events)}</details><details style="margin-top:8px"><summary class="small">Attendance (${teamRoster().filter(p=>attOf(m,p.id)==="P").length} present) – tap to edit</summary>${teamRoster().map(p=>`<div class="li"><span>${esc(p.name)}${m.travel.includes(p.id)?' <span class="small">(in room)</span>':""}</span>${attBtns(attOf(m,p.id),`setMatchAtt('${m.id}','${p.id}',X)`)}</div>`).join("")}</details><button class="bad" style="min-height:40px;margin-top:8px;font-size:14px" onclick="delMatch('${m.id}')">Delete match</button></div>`}).join("")}
+function vStats(){return `<div class="card"><h2>${TEAMS[S.team]} season totals (toss-ups &amp; steals)</h2><p class="small">${RANK_TEXT} Avg/rd = points ÷ rounds played (shown in brackets).</p>${statTable(pstats(teamMatches().flatMap(m=>m.events)),teamMatches())}</div>`+`<div class="card"><h2>Categories – season</h2>${catTable(teamMatches().flatMap(m=>m.events))}</div>`+lightningTable()+attTable()+
+ teamMatches().slice().reverse().map(m=>{const t=totals(m);return `<div class="card"><h2>vs ${esc(m.opp)} <span class="small">${esc(m.date)} · ${m.past?"entered after":m.done?"final":"in progress"}</span></h2>${m.past?`<button style="min-height:40px;font-size:14px;margin-bottom:6px" onclick="openPast('${m.id}')">✎ Edit match</button>`:""}<div class="qbar">${t.us} – ${t.them}</div><p class="small">${lightningRounds([m]).map(x=>`Lightning R${x.round}: <b>${x.correct}/5</b> (${x.players.map(id=>esc(nm(id))).join(", ")})`).join("<br>")||"No complete lightning rounds."}</p>${statTable(pstats(m.events),[m])}<details style="margin-top:8px"><summary class="small">Categories this match</summary>${catTable(m.events)}</details><details style="margin-top:8px"><summary class="small">Attendance (${teamRoster().filter(p=>attOf(m,p.id)==="P").length} present) – tap to edit</summary>${teamRoster().map(p=>`<div class="li"><span>${esc(p.name)}${m.travel.includes(p.id)?' <span class="small">(in room)</span>':""}</span>${attBtns(attOf(m,p.id),`setMatchAtt('${m.id}','${p.id}',X)`)}</div>`).join("")}</details><button class="bad" style="min-height:40px;margin-top:8px;font-size:14px" onclick="delMatch('${m.id}')">Delete match</button></div>`}).join("")}
 // ---- past match entry. The form (m.pastForm) is kept so the match can be edited; events are rebuilt from it on save:
 // per player/round correct (usC +2) and wrong buzzes (usW), optional categories, lightning x/5, plus one score
 // adjustment so the totals equal the final scores entered.
@@ -245,8 +252,8 @@ function vPast(){const ros=pfRoster(),present=ros.filter(p=>pf.att[p.id]!=="A");
  <div class="row"><button class="pri" onclick="savePast()">Save match</button><button onclick="pf=null;render()">Cancel</button></div>`}
 function savePast(){if(!pf.opp.trim())return alert("Enter the opponent.");if(pf.us===""||pf.them==="")return alert("Enter both final scores.");
  const ev=[];[0,1].forEach(r=>{pf.r[r].forEach(id=>{const x=pst(r,id);["c","w"].forEach(k=>{let left=x[k];CATS.forEach(c=>{for(let i=0;i<(x.cats[c]?.[k]||0);i++,left--)ev.push({round:r+1,q:1,code:k==="c"?"usC":"usW",cat:c,pid:id,res:k,us:k==="c"?2:0,them:0})});for(;left>0;left--)ev.push({round:r+1,q:1,code:k==="c"?"usC":"usW",cat:null,pid:id,res:k,us:k==="c"?2:0,them:0})})});
-  if(pf.light[r]!==""&&pf.light[r]!=null){const n=+pf.light[r];for(let q=16;q<=20;q++)ev.push({round:r+1,q,code:q-16<n?"lC":"lW",cat:null,pid:null,res:null,us:q-16<n?1:0,them:0})}});
- const su=ev.reduce((a,e)=>a+e.us,0),us=parseInt(pf.us,10)||0,them=parseInt(pf.them,10)||0;
+  if(pf.light[r]!==""&&pf.light[r]!=null){const n=+pf.light[r];for(let q=16;q<=20;q++)ev.push({round:r+1,q,code:q-16<n?"lC":"lW",cat:null,pid:null,res:null,us:q-16<n?2:0,them:0})}});
+ const su=ev.reduce((a,e)=>a+evUs(e),0),us=parseInt(pf.us,10)||0,them=parseInt(pf.them,10)||0;
  ev.push({round:2,q:0,code:"adj",cat:null,pid:null,res:null,us:us-su,them,note:"Final score (entered after the match)"});
  const travel=[...new Set([...pf.r[0],...pf.r[1]])],attendance={};pfRoster().forEach(p=>attendance[p.id]=pf.att[p.id]||"P");
  const form=JSON.parse(JSON.stringify(pf));delete form.id;
