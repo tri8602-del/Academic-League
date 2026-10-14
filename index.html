@@ -23,7 +23,7 @@ button:active{filter:brightness(.9)}
 .full{width:100%}.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1}
 input{font:inherit;font-size:17px;padding:12px;border:1px solid #c8d0dc;border-radius:10px;width:100%}
 .li{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #eef}
-.li span{flex:1;font-size:17px}.li button{min-height:44px;padding:8px 12px;font-size:15px}
+.li span{flex:1;font-size:17px}.li button{min-height:44px;padding:8px 9px;font-size:14px;white-space:nowrap}.li .gradeSel{font-size:14px;padding:6px 4px}
 .chips{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .chip{background:#eef2f8;border:2px solid transparent}.chip.on{background:#d7e7ff;border-color:#1f6feb}
 .chip.lock{opacity:.4}
@@ -34,6 +34,7 @@ nav button.on{color:#1f6feb}
 .score b{display:block;font-size:40px}.qbar{text-align:center;font-weight:700;font-size:18px;margin:10px 0}
 .teamSw{display:flex;background:#ffffff22;border-radius:10px;padding:3px}.teamSw button{min-height:40px;padding:6px 14px;font-size:15px;background:none;color:#fff}.teamSw button.on{background:#fff;color:#1f3a5f}
 .cats{display:flex;flex-wrap:wrap;gap:6px}.cats button{flex:1 0 28%;min-height:46px;padding:8px 6px;font-size:15px;background:#fff3d6;border:2px solid transparent}.cats button.on{background:#ffd24a;border-color:#b98800}
+.gradeSel{width:auto;min-height:44px;padding:6px;font:inherit;font-size:15px;border:1px solid #c8d0dc;border-radius:10px;background:#fff}
 .small{font-size:13px;color:#5b6678}
 table{width:100%;border-collapse:collapse;font-size:15px}th,td{padding:7px 4px;text-align:center;border-bottom:1px solid #eef}th:first-child,td:first-child{text-align:left}
 .tag{font-size:12px;padding:2px 7px;border-radius:999px;font-weight:700}.tin{background:#d8f3e2;color:#14743a}.tout{background:#fde2e2;color:#a12a2a}
@@ -97,11 +98,15 @@ function record(code){const m=M();const lightning=m.q>15;const o=(lightning?LIGH
 function undo(){const m=M();const e=m.events.pop();if(!e)return;m.round=e.round;m.q=e.q;m.stage="live";if(e.q<=15&&m.lightLineups)m.lightLineups[e.round-1]=null;m.done=false;sel=null;save();render()}
 // ---- views ----
 function vRoster(){return `<div class="card"><h2>${TEAMS[S.team]} roster (${teamRoster().length})</h2>
- ${teamRoster().map(p=>`<div class="li"><span>${esc(p.name)}</span><button onclick="moveTeam('${p.id}')">→ ${S.team==="V"?"JV":"Varsity"}</button><button onclick="ren('${p.id}')">Edit</button><button class="bad" onclick="del('${p.id}')">Remove</button></div>`).join("")||'<p class="small">No students yet.</p>'}
- <div class="row" style="margin-top:12px"><input id="newName" placeholder="Student name" onkeydown="if(event.key==='Enter')add()"><button class="pri" style="flex:0 0 90px" onclick="add()">Add</button></div></div>
+ ${teamRoster().map(p=>`<div class="li"><span>${esc(p.name)}</span><select class="gradeSel" aria-label="Grade" onchange="setGrade('${p.id}',this.value)">${gradeOpts(p.grade)}</select><button onclick="moveTeam('${p.id}')">→ ${S.team==="V"?"JV":"Varsity"}</button><button onclick="ren('${p.id}')">Edit</button><button class="bad" onclick="del('${p.id}')">Remove</button></div>`).join("")||'<p class="small">No students yet.</p>'}
+ <div class="row" style="margin-top:12px"><input id="newName" placeholder="Student name" onkeydown="if(event.key==='Enter')add()"><select id="newGrade" class="gradeSel" aria-label="Grade" style="flex:0 0 84px">${gradeOpts("")}</select><button class="pri" style="flex:0 0 90px" onclick="add()">Add</button></div></div>
  <div class="card"><h2>Backup</h2><div class="row"><button onclick="exp()">Export JSON</button><button onclick="$('#imp').click()">Import JSON</button></div><input type="file" id="imp" accept=".json,application/json" style="display:none" onchange="imp(this)"></div>`}
-function add(){const v=$("#newName").value.trim();if(!v)return;S.roster.push({id:uid(),name:v,team:S.team});save();render();setTimeout(()=>$("#newName").focus(),0)}
+function add(){const v=$("#newName").value.trim();if(!v)return;const g=+$("#newGrade").value;S.roster.push({id:uid(),name:v,team:S.team,...(g?{grade:g}:{})});save();render();setTimeout(()=>$("#newName").focus(),0)}
 function moveTeam(id){const p=S.roster.find(x=>x.id===id);p.team=p.team==="V"?"JV":"V";save();render()}
+// Grade level 9-12 (optional). Students without one just sort last on ties.
+const gradeOpts=g=>`<option value="">Gr –</option>`+[9,10,11,12].map(n=>`<option value="${n}" ${+g===n?"selected":""}>Gr ${n}</option>`).join("");
+function setGrade(id,v){const p=S.roster.find(x=>x.id===id);if(v)p.grade=+v;else delete p.grade;save();render()}
+const gradeOf=id=>+(S.roster.find(p=>p.id===id)?.grade)||0;
 function ren(id){const p=S.roster.find(x=>x.id===id);const v=prompt("Name",p.name);if(v&&v.trim()){p.name=v.trim();save();render()}}
 function del(id){if(confirm(`Remove ${nm(id)} from the roster? (Past stats are kept.)`)){S.roster=S.roster.filter(p=>p.id!==id);save();render()}}
 function vMatch(){const m=M();
@@ -135,11 +140,12 @@ function suggestion(m){const ms=pstats(m.events.filter(e=>e.round===1)),ss=seaso
  // a player who has not answered yet this match counts as season accuracy (or 50%), not 0%
  // Each wrong buzz costs 1 point in the ranking (penalizes a high wrong-buzz rate); ties by accuracy, then season.
  const cs=catStats(teamMatches().flatMap(x=>x.events)).pl,catScore=id=>Object.values(cs[id]||{}).reduce((a,v)=>a+v.c-v.w,0);
- const sc=id=>[(ms[id]?.pts||0)-(ms[id]?.w||0),acc(ms[id])??acc(ss[id])??50,(ss[id]?.pts||0)-(ss[id]?.w||0),acc(ss[id])??-1,catScore(id)];
- return [...m.travel].sort((a,b)=>{const x=sc(a),y=sc(b);for(let i=0;i<5;i++)if(x[i]!==y[i])return y[i]-x[i];return 0}).slice(0,4)}
+ // Ties on points-minus-wrong-buzzes go to the higher grade first, then the other tiebreakers.
+ const sc=id=>[(ms[id]?.pts||0)-(ms[id]?.w||0),gradeOf(id),acc(ms[id])??acc(ss[id])??50,(ss[id]?.pts||0)-(ss[id]?.w||0),acc(ss[id])??-1,catScore(id)];
+ return [...m.travel].sort((a,b)=>{const x=sc(a),y=sc(b);for(let i=0;i<6;i++)if(x[i]!==y[i])return y[i]-x[i];return 0}).slice(0,4)}
 function vSub(m){const cpl=catStats(teamMatches().flatMap(x=>x.events)).pl,ms=pstats(m.events.filter(e=>e.round===1)),ss=seasonStats(m.id),sug=suggestion(m);subPick??=[...m.lineups[0]];const t=totals(m);
  return `<div class="score"><div>Us<b>${t.us}</b></div><div>${esc(m.opp)}<b>${t.them}</b></div></div>
- <div class="card" style="margin-top:12px"><h2>Between rounds – subs</h2><p class="small">Suggested 4 ranked by Round 1 points minus wrong buzzes, then accuracy, then season, then category record (★ = best categories this season). Lightning R1: <b>${lightningRounds([m]).find(x=>x.round===1)?.correct??"–"}/5</b> (team). Tap rows to choose Round 2 players.</p>
+ <div class="card" style="margin-top:12px"><h2>Between rounds – subs</h2><p class="small">Suggested 4 ranked by Round 1 points minus wrong buzzes, then grade (higher first), then accuracy, then season, then category record (★ = best categories this season). Lightning R1: <b>${lightningRounds([m]).find(x=>x.round===1)?.correct??"–"}/5</b> (team). Tap rows to choose Round 2 players.</p>
  <table><tr><th>Player</th><th>✓</th><th>Wrong buzzes</th><th>Pts</th><th>Acc</th><th>Season</th><th></th></tr>
  ${m.travel.map(id=>{const s=ms[id]||{c:0,w:0,pts:0},se=ss[id];const on=subPick.includes(id),was=m.lineups[0].includes(id);return `<tr onclick="tgSub('${id}')" style="background:${on?"#e3eeff":""}"><td><b>${on?"☑":"☐"} ${esc(nm(id))}</b>${was?' <span class="small">(R1)</span>':""}${bestCats(cpl[id]).length?`<div class="small">★ ${bestCats(cpl[id]).join(", ")}</div>`:""}</td><td>${s.c}</td><td>${s.w}${s.c+s.w?` <span class="small">(${Math.round(buzzRate(s)*100)}%)</span>`:""}</td><td>${s.pts}</td><td>${acc(s)??"–"}${acc(s)!=null?"%":""}</td><td class="small">${se?se.pts+"p "+(acc(se)??"–")+"% "+se.w+"✗":"–"}</td><td>${sug.includes(id)?'<span class="tag tin">IN</span>':'<span class="tag tout">OUT</span>'}</td></tr>`}).join("")}</table>
  <div class="row" style="margin-top:12px"><button onclick="subPick=[...suggestion(M())];render()">Use suggestion</button><button onclick="subPick=[...M().lineups[0]];render()">Keep same 4</button></div></div>
