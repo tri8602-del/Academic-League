@@ -57,7 +57,7 @@ function pstats(events){const o={};const g=id=>o[id]??={c:0,w:0,pts:0};
   events.forEach(e=>{if(!e.pid||e.q>15)return;const s=g(e.pid);if(e.res==="c"){s.c++;s.pts+=e.us}else if(e.res==="w")s.w++;});return o}
 const buzzRate=s=>s&&s.c+s.w?s.w/(s.c+s.w):0;
 // Lightning: per finished round, correct out of 5 and the 4 players who were in.
-function lightningRounds(ms){const out=[];ms.forEach(m=>[1,2].forEach(r=>{const ev=m.events.filter(e=>e.round===r&&e.q>15);if(ev.length<5||!m.lineups[r-1]?.length)return;out.push({m,round:r,correct:ev.filter(e=>e.code==="lC").length,players:m.lineups[r-1]})}));return out}
+function lightningRounds(ms){const out=[];ms.forEach(m=>[1,2].forEach(r=>{const ev=m.events.filter(e=>e.round===r&&e.q>15);if(ev.length<5||!(m.lightLineups?.[r-1]||m.lineups[r-1])?.length)return;out.push({m,round:r,correct:ev.filter(e=>e.code==="lC").length,players:m.lightLineups?.[r-1]||m.lineups[r-1]})}));return out}
 function lightningByPlayer(rounds){const o={};rounds.forEach(x=>x.players.forEach(id=>{o[id]??={n:0,sum:0};o[id].n++;o[id].sum+=x.correct}));return o}
 const acc=s=>s&&s.c+s.w?Math.round(s.c/(s.c+s.w)*100):null;
 function seasonStats(excludeId){return pstats(S.matches.filter(m=>m.id!==excludeId).flatMap(m=>m.events))}
@@ -77,7 +77,7 @@ function record(code){const m=M();const lightning=m.q>15;const o=(lightning?LIGH
   if(o.need&&!sel){alert("Tap the player who answered first.");return}
   m.events.push({round:m.round,q:m.q,code,pid:o.res&&!lightning?sel:null,res:o.res||null,us:o.us||0,them:o.them||0});
   sel=null;m.q++;if(m.q>20){if(m.round===1){m.stage="sub"}else{m.stage="done";m.done=true}}save();render()}
-function undo(){const m=M();const e=m.events.pop();if(!e)return;m.round=e.round;m.q=e.q;m.stage="live";m.done=false;sel=null;save();render()}
+function undo(){const m=M();const e=m.events.pop();if(!e)return;m.round=e.round;m.q=e.q;m.stage="live";if(e.q<=15&&m.lightLineups)m.lightLineups[e.round-1]=null;m.done=false;sel=null;save();render()}
 // ---- views ----
 function vRoster(){return `<div class="card"><h2>Roster (${S.roster.length})</h2>
  ${S.roster.map(p=>`<div class="li"><span>${esc(p.name)}</span><button onclick="ren('${p.id}')">Edit</button><button class="bad" onclick="del('${p.id}')">Remove</button></div>`).join("")||'<p class="small">No students yet.</p>'}
@@ -97,10 +97,19 @@ function vMatch(){const m=M();
 function tg(k,id,max){const a=draft[k];const i=a.indexOf(id);if(i>=0){a.splice(i,1);if(k==="travel")draft.start=draft.start.filter(x=>x!==id)}else if(a.length<max)a.push(id);render()}
 function startMatch(){if(!draft.opp.trim())return alert("Enter the opponent.");if(draft.travel.length!==8&&!confirm(`Only ${draft.travel.length} in the room selected. Continue?`))return;if(draft.start.length!==4)return alert("Pick the starting 4.");
  const m={id:uid(),opp:draft.opp.trim(),date:draft.date,travel:[...draft.travel],lineups:[[...draft.start],[]],round:1,q:1,stage:"live",events:[],done:false};S.matches.push(m);S.cur=m.id;draft=null;save();render()}
-function vLive(m){const t=totals(m);const lightning=m.q>15;const lu=m.lineups[m.round-1];
+// Lightning: all in-room players may play. At Q16 the coach confirms who is in (default: all in the room).
+let lightPick=null;
+function vLightPick(m){lightPick??=[...(m.lightLineups?.[m.round-1]||m.travel)];const t=totals(m);
+ return `<div class="score"><div>Us<b>${t.us}</b></div><div>${esc(m.opp)}<b>${t.them}</b></div></div>
+ <div class="qbar">Round ${m.round} · ⚡ Lightning lineup</div>
+ <div class="card"><p class="small">Everyone in the room can play lightning. Uncheck anyone who isn't playing.</p><div class="chips">${m.travel.map(id=>`<button class="chip ${lightPick.includes(id)?"on":""}" onclick="tgLight('${id}')">${lightPick.includes(id)?"☑":"☐"} ${esc(nm(id))}</button>`).join("")}</div></div>
+ <button class="pri full" onclick="setLight()">Start lightning (${lightPick.length} players)</button><div style="height:8px"></div><button class="full" onclick="lightPick=null;undo()">↶ Undo last question</button>`}
+function tgLight(id){const i=lightPick.indexOf(id);if(i>=0)lightPick.splice(i,1);else lightPick.push(id);render()}
+function setLight(){if(!lightPick.length)return alert("Pick at least one player.");const m=M();m.lightLineups??=[null,null];m.lightLineups[m.round-1]=[...lightPick];m.lightEdit=false;lightPick=null;save();render()}
+function vLive(m){if(m.q>15&&(!m.lightLineups?.[m.round-1]||m.lightEdit))return vLightPick(m);const t=totals(m);const lightning=m.q>15;const lu=lightning?m.lightLineups[m.round-1]:m.lineups[m.round-1];
  return `<div class="score"><div>Us<b>${t.us}</b></div><div>${esc(m.opp)}<b>${t.them}</b></div></div>
  <div class="qbar">Round ${m.round} of 2 · Q${m.q} of 20 · ${lightning?"⚡ Lightning (2 pts)":"Toss-up (2 pts / steal 1)"}</div>
- ${lightning?`<div class="card"><div class="small">Lightning is team-only. In: ${lu.map(id=>esc(nm(id))).join(", ")} · Correct so far: <b>${m.events.filter(e=>e.round===m.round&&e.q>15&&e.code==="lC").length}/${m.q-16}</b></div></div>`:`<div class="card"><div class="small" style="margin-bottom:6px">Who buzzed? (tap first for our answers; optional on steals)</div><div class="chips">${lu.map(id=>`<button class="chip ${sel===id?"on":""}" onclick="sel=sel==='${id}'?null:'${id}';render()">${esc(nm(id))}</button>`).join("")}</div></div>`}
+ ${lightning?`<div class="card"><div class="small">Lightning is team-only. In (${lu.length}): ${lu.map(id=>esc(nm(id))).join(", ")} <a href="#" onclick="M().lightEdit=true;render();return false">change</a> · Correct so far: <b>${m.events.filter(e=>e.round===m.round&&e.q>15&&e.code==="lC").length}/${m.q-16}</b></div></div>`:`<div class="card"><div class="small" style="margin-bottom:6px">Who buzzed? (tap first for our answers; optional on steals)</div><div class="chips">${lu.map(id=>`<button class="chip ${sel===id?"on":""}" onclick="sel=sel==='${id}'?null:'${id}';render()">${esc(nm(id))}</button>`).join("")}</div></div>`}
  <div class="grid2">${(lightning?LIGHT:TOSS).map(x=>`<button class="${x[2]}" style="min-height:70px" onclick="record('${x[0]}')">${x[1]}</button>`).join("")}</div>
  <div class="row" style="margin-top:12px"><button onclick="undo()">↶ Undo last</button><button class="mut" onclick="if(confirm('End this match now?')){M().done=true;M().stage='done';save();tab='stats';render()}">End match</button></div>
  <div class="card" style="margin-top:12px"><div class="log">${m.events.slice().reverse().map(e=>`R${e.round} Q${e.q}: ${e.code}${e.pid?" – "+esc(nm(e.pid)):""} (+${e.us}/+${e.them})`).join("<br>")||"No questions yet."}</div></div>`}
